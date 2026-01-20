@@ -13,7 +13,7 @@ export default {
                     500: '#2d2d2d',
                 },
                 accent: {
-                    green: '#22c55e',
+                    primary: '#2979FF',
                     teal: '#14b8a6',
                     orange: '#f97316',
                     red: '#ef4444',

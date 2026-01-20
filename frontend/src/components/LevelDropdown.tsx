@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react'
 import type { Level } from '../types'
 import { FREE_LEVELS } from '../types'
 
@@ -18,20 +19,59 @@ const LEVEL_LABELS: Record<Level, string> = {
 }
 
 export default function LevelDropdown({ selected, onChange }: LevelDropdownProps) {
+    const [isOpen, setIsOpen] = useState(false)
+    const dropdownRef = useRef<HTMLDivElement>(null)
+
+    // Close on click outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    const handleSelect = (level: Level) => {
+        onChange(level)
+        setIsOpen(false)
+    }
+
+
     return (
-        <div className="flex gap-2 flex-wrap">
-            {FREE_LEVELS.map((level) => (
-                <button
-                    key={level}
-                    onClick={() => onChange(level)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${selected === level
-                            ? 'bg-accent-green text-black'
-                            : 'bg-dark-600 text-gray-300 hover:bg-dark-500'
-                        }`}
+        <div className="relative w-full md:w-64" ref={dropdownRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-dark-700 hover:bg-dark-600 border border-dark-600 rounded-lg text-white transition-all outline-none focus:border-accent-primary"
+            >
+                <span className="font-medium">{LEVEL_LABELS[selected]}</span>
+                <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
                 >
-                    {LEVEL_LABELS[level]}
-                </button>
-            ))}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            {isOpen && (
+                <div className="absolute z-50 w-full mt-2 bg-dark-800 border border-dark-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {FREE_LEVELS.map((level) => (
+                        <button
+                            key={level}
+                            onClick={() => handleSelect(level)}
+                            className={`w-full text-left px-4 py-3 text-sm transition-colors ${selected === level
+                                ? 'bg-accent-primary/10 text-accent-primary font-medium'
+                                : 'text-gray-300 hover:bg-dark-700'
+                                }`}
+                        >
+                            {LEVEL_LABELS[level]}
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     )
 }

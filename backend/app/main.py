@@ -1,18 +1,20 @@
 """FastAPI main application."""
 
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.routers import pinned, query, export
 from app.services.cache import close_redis
+from app.services.inference import close_client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """App lifespan: startup/shutdown."""
     yield
-    await close_redis()
+    await asyncio.gather(close_redis(), close_client())
 
 
 app = FastAPI(

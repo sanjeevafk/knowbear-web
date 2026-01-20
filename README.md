@@ -116,6 +116,4 @@ KnowBear/
 └── vercel.json        # Deployment config
 ```
 
-## License
 
-MIT

@@ -15,11 +15,34 @@ body {
   min-height: 100vh;
 }
 
-.level-eli5 { border-left-color: #22c55e; }
-.level-eli10 { border-left-color: #14b8a6; }
-.level-eli12 { border-left-color: #06b6d4; }
-.level-eli15 { border-left-color: #3b82f6; }
-.level-meme { border-left-color: #a855f7; }
-.level-technical { border-left-color: #f97316; }
-.level-systemic { border-left-color: #ef4444; }
-.level-diagram { border-left-color: #ec4899; }
+.level-eli5 {
+  border-left-color: #22c55e;
+}
+
+.level-eli10 {
+  border-left-color: #14b8a6;
+}
+
+.level-eli12 {
+  border-left-color: #06b6d4;
+}
+
+.level-eli15 {
+  border-left-color: #3b82f6;
+}
+
+.level-meme {
+  border-left-color: #a855f7;
+}
+
+.level-technical {
+  border-left-color: #f97316;
+}
+
+.level-systemic {
+  border-left-color: #ef4444;
+}
+
+.level-diagram {
+  border-left-color: #ec4899;
+}

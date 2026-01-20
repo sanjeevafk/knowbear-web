@@ -42,8 +42,8 @@ export default function SearchBar({ onSearch, loading, mode, onModeChange }: Sea
                     type="button"
                     onClick={() => onModeChange('fast')}
                     className={`px-4 py-1 rounded-full text-sm font-medium transition-colors ${mode === 'fast'
-                            ? 'bg-accent-green/20 text-accent-green border border-accent-green'
-                            : 'text-gray-400 hover:text-white border border-transparent'
+                        ? 'bg-accent-green/20 text-accent-green border border-accent-green'
+                        : 'text-gray-400 hover:text-white border border-transparent'
                         }`}
                 >
                     🚀 Fast Mode
@@ -52,8 +52,8 @@ export default function SearchBar({ onSearch, loading, mode, onModeChange }: Sea
                     type="button"
                     onClick={() => onModeChange('ensemble')}
                     className={`px-4 py-1 rounded-full text-sm font-medium transition-colors ${mode === 'ensemble'
-                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500'
-                            : 'text-gray-400 hover:text-white border border-transparent'
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500'
+                        : 'text-gray-400 hover:text-white border border-transparent'
                         }`}
                 >
                     🧠 Deep Research (Ensemble)

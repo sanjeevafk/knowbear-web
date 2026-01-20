@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getPinnedTopics, queryTopic } from './api'
 import type { PinnedTopic, QueryResponse, Level } from './types'
 import { FREE_LEVELS } from './types'
@@ -16,6 +16,10 @@ export default function App() {
     const [selectedLevel, setSelectedLevel] = useState<Level>('eli5')
     const [error, setError] = useState<string | null>(null)
     const [mode, setMode] = useState<'fast' | 'ensemble'>('fast')
+    const [fetchingLevels, setFetchingLevels] = useState<Set<Level>>(new Set())
+
+    // Use a ref to track current search topic to avoid race conditions
+    const currentTopicRef = useRef<string | null>(null)
 
     useEffect(() => {
         getPinnedTopics()
@@ -23,29 +27,86 @@ export default function App() {
             .catch(() => { })
     }, [])
 
+    const fetchLevel = useCallback(async (topic: string, level: Level) => {
+        if (!topic) return
+        setFetchingLevels(prev => new Set(prev).add(level))
+        try {
+            const res = await queryTopic({
+                topic,
+                levels: [level],
+                mode
+            })
+
+            // Only update if it's still the current topic
+            if (currentTopicRef.current === topic) {
+                setResult(prev => {
+                    if (!prev || prev.topic !== topic) {
+                        return { ...res, explanations: { ...res.explanations } }
+                    }
+                    return {
+                        ...prev,
+                        explanations: { ...prev.explanations, ...res.explanations }
+                    }
+                })
+            }
+        } catch (err) {
+            console.error(`Failed to fetch ${level}:`, err)
+        } finally {
+            setFetchingLevels(prev => {
+                const next = new Set(prev)
+                next.delete(level)
+                return next
+            })
+        }
+    }, [mode])
+
     const handleSearch = useCallback(async (topic: string) => {
         setLoading(true)
         setError(null)
         setResult(null)
+        setFetchingLevels(new Set())
+        currentTopicRef.current = topic
+
         try {
+            // Initial fetch for the selected level only for speed
             const res = await queryTopic({
                 topic,
-                levels: [...FREE_LEVELS],
+                levels: [selectedLevel],
                 mode
             })
-            setResult(res)
+
+            if (currentTopicRef.current === topic) {
+                setResult(res)
+
+                // Background fetch others if in fast mode to pre-cache
+                if (mode === 'fast') {
+                    FREE_LEVELS.forEach(lvl => {
+                        if (lvl !== selectedLevel) {
+                            fetchLevel(topic, lvl)
+                        }
+                    })
+                }
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to generate')
         } finally {
             setLoading(false)
         }
-    }, [mode])
+    }, [mode, selectedLevel, fetchLevel])
+
+    // Fetch level when user switches and it's missing
+    useEffect(() => {
+        if (result && !result.explanations[selectedLevel] && !fetchingLevels.has(selectedLevel)) {
+            fetchLevel(result.topic, selectedLevel)
+        }
+    }, [selectedLevel, result, fetchingLevels, fetchLevel])
 
     return (
         <div className="min-h-screen bg-dark-900 px-4 py-8">
-            <header className="text-center mb-12">
-                <h1 className="text-4xl font-bold text-white mb-2">
-                    🐻 Know<span className="text-accent-green">Bear</span>
+            <header className="text-center mb-12 flex flex-col items-center">
+                <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
+                    <img src="/favicon.svg" alt="KnowBear Logo" className="w-12 h-12" />
+                    <span>Know<span className="text-accent-primary">Bear</span></span>
                 </h1>
                 <p className="text-gray-400">AI-powered explanations for any topic</p>
             </header>
@@ -61,7 +122,7 @@ export default function App() {
                 {loading && (
                     <div className="py-12">
                         <Spinner size="lg" />
-                        <p className="text-center text-gray-400 mt-4">Generating explanations...</p>
+                        <p className="text-center text-gray-400 mt-4">Generating explanation for {selectedLevel}...</p>
                     </div>
                 )}
 
@@ -80,8 +141,17 @@ export default function App() {
 
                         <LevelDropdown selected={selectedLevel} onChange={setSelectedLevel} />
 
-                        {result.explanations[selectedLevel] && (
+                        {fetchingLevels.has(selectedLevel) ? (
+                            <div className="bg-dark-700 rounded-lg p-12 flex flex-col items-center">
+                                <Spinner size="md" />
+                                <p className="text-gray-400 mt-4">Brewing {selectedLevel} explanation...</p>
+                            </div>
+                        ) : result.explanations[selectedLevel] ? (
                             <ExplanationCard level={selectedLevel} content={result.explanations[selectedLevel]} />
+                        ) : (
+                            <div className="bg-dark-700/50 rounded-lg p-12 text-center text-gray-500 italic">
+                                No explanation available for this level.
+                            </div>
                         )}
 
                         {result.cached && (

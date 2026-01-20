@@ -6,6 +6,13 @@ from app.prompts import PROMPTS
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
+# Global client for connection pooling
+_client = httpx.AsyncClient(timeout=30.0)
+
+
+async def close_client():
+    await _client.aclose()
+
 
 async def call_model(model: str, prompt: str, max_tokens: int = 1024) -> str:
     """Call Groq API with given model and prompt."""
@@ -20,11 +27,10 @@ async def call_model(model: str, prompt: str, max_tokens: int = 1024) -> str:
         "max_tokens": max_tokens,
         "temperature": 0.7,
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(GROQ_URL, json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"].strip()
+    resp = await _client.post(GROQ_URL, json=payload, headers=headers)
+    resp.raise_for_status()
+    data = resp.json()
+    return data["choices"][0]["message"]["content"].strip()
 
 
 async def generate_explanation(topic: str, level: str, model: str) -> str:
