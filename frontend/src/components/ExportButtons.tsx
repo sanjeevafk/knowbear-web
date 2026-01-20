@@ -26,21 +26,15 @@ export default function ExportButtons({ topic, explanations }: ExportButtonsProp
         <div className="flex gap-2">
             <button
                 onClick={() => handleExport('txt')}
-                className="px-4 py-2 bg-dark-600 text-gray-300 rounded-lg hover:bg-dark-500 text-sm"
+                className="px-4 py-2 bg-dark-600 text-gray-300 rounded-lg hover:bg-dark-500 text-sm transition-colors"
             >
                 Export .txt
             </button>
             <button
                 onClick={() => handleExport('json')}
-                className="px-4 py-2 bg-dark-600 text-gray-300 rounded-lg hover:bg-dark-500 text-sm"
+                className="px-4 py-2 bg-dark-600 text-gray-300 rounded-lg hover:bg-dark-500 text-sm transition-colors"
             >
                 Export .json
-            </button>
-            <button
-                onClick={() => handleExport('pdf')}
-                className="px-4 py-2 bg-dark-600 text-gray-300 rounded-lg hover:bg-dark-500 text-sm"
-            >
-                Export .pdf
             </button>
         </div>
     )

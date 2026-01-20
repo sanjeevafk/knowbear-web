@@ -1,13 +1,13 @@
 """Token-efficient prompt templates."""
 
 PROMPTS: dict[str, str] = {
-    "eli5": "Explain {topic} like I'm 5: simple words, short sentences, easy analogy.",
-    "eli10": "Explain {topic} for a 10-year-old: basic terms, clear examples.",
-    "eli12": "Explain {topic} for a 12-year-old: some technical terms, real-world examples.",
-    "eli15": "Explain {topic} for a 15-year-old: more depth, key concepts explained.",
-    "meme": "Explain {topic} as a funny one-liner meme with relatable analogy.",
-    "technical": "Technical explanation of {topic}: key concepts, equations if relevant.",
-    "systemic": "Describe {topic} as an interconnected system: main components and relationships.",
+    "eli5": "Explain {topic} like I'm 5: simple words, short sentences, easy analogy. Output in plain text only, no markdown, no bolding, no headers. Just paragraphs.",
+    "eli10": "Explain {topic} for a 10-year-old: basic terms, clear examples. Output in plain text only, no markdown, no bolding, no headers. Just paragraphs.",
+    "eli12": "Explain {topic} for a 12-year-old: some technical terms, real-world examples. Output in plain text only, no markdown, no bolding, no headers. Just paragraphs.",
+    "eli15": "Explain {topic} for a 15-year-old: more depth, key concepts explained. Output in plain text only, no markdown, no bolding, no headers. Just paragraphs.",
+    "meme": "Explain {topic} as a funny one-liner meme with relatable analogy. Output in plain text only.",
+    "technical": "Technical explanation of {topic}: key concepts, equations if relevant. Output in plain text only, no markdown, no bolding, no headers. Just paragraphs.",
+    "systemic": "Describe {topic} as an interconnected system: main components and relationships. Output in plain text only, no markdown, no bolding, no headers. Just paragraphs.",
     "diagram": "Create Mermaid.js flowchart for {topic}: nodes=components, edges=relationships. Output ONLY valid mermaid code.",
 }
 

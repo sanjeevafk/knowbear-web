@@ -94,6 +94,14 @@ export default function App() {
         }
     }, [mode, selectedLevel, fetchLevel])
 
+    const handleGoHome = useCallback(() => {
+        setResult(null)
+        setError(null)
+        setLoading(false)
+        currentTopicRef.current = null
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }, [])
+
     // Fetch level when user switches and it's missing
     useEffect(() => {
         if (result && !result.explanations[selectedLevel] && !fetchingLevels.has(selectedLevel)) {
@@ -102,70 +110,83 @@ export default function App() {
     }, [selectedLevel, result, fetchingLevels, fetchLevel])
 
     return (
-        <div className="min-h-screen bg-dark-900 px-4 py-8">
-            <header className="text-center mb-12 flex flex-col items-center">
-                <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-                    <img src="/favicon.svg" alt="KnowBear Logo" className="w-12 h-12" />
-                    <span>Know<span className="text-accent-primary">Bear</span></span>
-                </h1>
-                <p className="text-gray-400">AI-powered explanations for any topic</p>
-            </header>
+        <div className="min-h-screen bg-black px-4 py-8 relative overflow-hidden">
+            {/* Starry Background */}
+            <div className="stars"></div>
+            <div className="stars stars-2"></div>
 
-            <main className="max-w-4xl mx-auto space-y-8">
-                <SearchBar
-                    onSearch={handleSearch}
-                    loading={loading}
-                    mode={mode}
-                    onModeChange={setMode}
-                />
+            {/* Content Container */}
+            <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col min-h-[90vh]">
+                <header className="text-center mb-12 flex flex-col items-center">
+                    <button
+                        onClick={handleGoHome}
+                        className="group flex flex-col md:flex-row items-center gap-3 transition-transform hover:scale-105 active:scale-95 focus:outline-none cursor-pointer"
+                        aria-label="KnowBear Home"
+                    >
+                        <h1 className="text-4xl md:text-5xl font-bold text-white flex flex-col md:flex-row items-center gap-3">
+                            <img src="/favicon.svg" alt="KnowBear Logo" className="w-16 h-16 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] group-hover:drop-shadow-[0_0_25px_rgba(6,182,212,0.8)] transition-all" />
+                            <span>Know<span className="text-cyan-500 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]">Bear</span></span>
+                        </h1>
+                    </button>
+                    <p className="text-gray-400 mt-2 text-lg">AI-powered explanations for any topic</p>
+                </header>
 
-                {loading && (
-                    <div className="py-12">
-                        <Spinner size="lg" />
-                        <p className="text-center text-gray-400 mt-4">Generating explanation for {selectedLevel}...</p>
-                    </div>
-                )}
+                <main className="space-y-8 flex-grow">
+                    <SearchBar
+                        onSearch={handleSearch}
+                        loading={loading}
+                        mode={mode}
+                        onModeChange={setMode}
+                    />
 
-                {error && (
-                    <div className="bg-red-900/30 border border-red-500 text-red-300 p-4 rounded-lg">
-                        {error}
-                    </div>
-                )}
-
-                {result && (
-                    <section className="space-y-6">
-                        <div className="flex items-center justify-between flex-wrap gap-4">
-                            <h2 className="text-xl font-semibold text-white">{result.topic}</h2>
-                            <ExportButtons topic={result.topic} explanations={result.explanations} />
+                    {loading && (
+                        <div className="py-12 flex flex-col items-center">
+                            <Spinner size="lg" />
+                            <p className="text-center text-gray-400 mt-4 animate-pulse">Generating explanation for {selectedLevel}...</p>
                         </div>
+                    )}
 
-                        <LevelDropdown selected={selectedLevel} onChange={setSelectedLevel} />
+                    {error && (
+                        <div className="bg-red-900/30 border border-red-500 text-red-300 p-4 rounded-lg">
+                            {error}
+                        </div>
+                    )}
 
-                        {fetchingLevels.has(selectedLevel) ? (
-                            <div className="bg-dark-700 rounded-lg p-12 flex flex-col items-center">
-                                <Spinner size="md" />
-                                <p className="text-gray-400 mt-4">Brewing {selectedLevel} explanation...</p>
+                    {result && (
+                        <section className="space-y-6">
+                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-dark-700 pb-4">
+                                <h2 className="text-2xl font-semibold text-white text-center md:text-left">{result.topic}</h2>
+                                <ExportButtons topic={result.topic} explanations={result.explanations} />
                             </div>
-                        ) : result.explanations[selectedLevel] ? (
-                            <ExplanationCard level={selectedLevel} content={result.explanations[selectedLevel]} />
-                        ) : (
-                            <div className="bg-dark-700/50 rounded-lg p-12 text-center text-gray-500 italic">
-                                No explanation available for this level.
-                            </div>
-                        )}
 
-                        {result.cached && (
-                            <p className="text-sm text-gray-500">⚡ Served from cache</p>
-                        )}
-                    </section>
-                )}
+                            <LevelDropdown selected={selectedLevel} onChange={setSelectedLevel} />
 
-                {!result && !loading && <PinnedTopics topics={pinned} onSelect={handleSearch} />}
-            </main>
+                            {fetchingLevels.has(selectedLevel) ? (
+                                <div className="bg-dark-700/50 backdrop-blur-sm rounded-lg p-12 flex flex-col items-center border border-dark-600">
+                                    <Spinner size="md" />
+                                    <p className="text-gray-400 mt-4">Brewing {selectedLevel} explanation...</p>
+                                </div>
+                            ) : result.explanations[selectedLevel] ? (
+                                <ExplanationCard level={selectedLevel} content={result.explanations[selectedLevel]} />
+                            ) : (
+                                <div className="bg-dark-700/50 backdrop-blur-sm rounded-lg p-12 text-center text-gray-500 italic border border-dark-600">
+                                    No explanation available for this level.
+                                </div>
+                            )}
 
-            <footer className="mt-16 text-center text-gray-600 text-sm">
-                © 2026 KnowBear • Powered by Groq AI
-            </footer>
+                            {result.cached && (
+                                <p className="text-sm text-gray-500">⚡ Served from cache</p>
+                            )}
+                        </section>
+                    )}
+
+                    {!result && !loading && <PinnedTopics topics={pinned} onSelect={handleSearch} />}
+                </main>
+
+                <footer className="mt-16 text-center text-gray-600 text-sm pb-4">
+                    © 2026 KnowBear • Powered by Groq AI
+                </footer>
+            </div>
         </div>
     )
 }
