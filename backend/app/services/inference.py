@@ -41,10 +41,10 @@ async def call_model(model: str, prompt: str, max_tokens: int = 1024, **kwargs) 
     return data["choices"][0]["message"]["content"].strip()
 
 
-async def generate_explanation(topic: str, level: str, model: str) -> str:
+async def generate_explanation(topic: str, level: str, model: str, **kwargs) -> str:
     """Generate explanation for topic at given level."""
     template = PROMPTS.get(level)
     if not template:
         raise ValueError(f"Unknown level: {level}")
     prompt = template.format(topic=topic)
-    return await call_model(model, prompt)
+    return await call_model(model, prompt, **kwargs)
