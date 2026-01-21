@@ -8,6 +8,9 @@ import LevelDropdown from '../components/LevelDropdown'
 import ExplanationCard from '../components/ExplanationCard'
 import ExportDropdown from '../components/ExportDropdown'
 import Spinner from '../components/Spinner'
+import { useUsageGate } from '../hooks/useUsageGate'
+import { UpgradeModal } from '../components/UpgradeModal'
+import { RefreshCcw } from 'lucide-react'
 
 export default function AppPage() {
     const [pinned, setPinned] = useState<PinnedTopic[]>([])
@@ -17,6 +20,8 @@ export default function AppPage() {
     const [error, setError] = useState<string | null>(null)
     const [mode, setMode] = useState<'fast' | 'ensemble'>('fast')
     const [fetchingLevels, setFetchingLevels] = useState<Set<Level>>(new Set())
+
+    const { checkAction, recordAction, showPremiumModal, setShowPremiumModal } = useUsageGate()
 
     // Use a ref to track current search topic to avoid race conditions
     const currentTopicRef = useRef<string | null>(null)
@@ -61,6 +66,12 @@ export default function AppPage() {
     }, [mode])
 
     const handleSearch = useCallback(async (topic: string) => {
+        // Usage gate check (handles both Guest and Pro limits if any)
+        if (!checkAction('search')) {
+            return
+        }
+        recordAction('search')
+
         setLoading(true)
         setError(null)
         setResult(null)
@@ -158,8 +169,19 @@ export default function AppPage() {
                                 <h2 className="text-2xl font-semibold text-white text-center md:text-left">{result.topic}</h2>
                             </div>
 
-                            <div className="flex flex-col md:flex-row md:justify-between gap-4">
-                                <LevelDropdown selected={selectedLevel} onChange={setSelectedLevel} />
+                            <div className="flex flex-col md:flex-row md:justify-between items-center gap-4">
+                                <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                                    <LevelDropdown selected={selectedLevel} onChange={setSelectedLevel} />
+                                    <button
+                                        onClick={() => handleSearch(result.topic)}
+                                        disabled={loading}
+                                        className="flex items-center gap-2 px-4 py-3 bg-dark-700 hover:bg-dark-600 border border-dark-600 rounded-lg text-white transition-all disabled:opacity-50 w-full md:w-auto justify-center"
+                                        title="Recreate Response"
+                                    >
+                                        <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                        <span className="md:hidden lg:inline">Recreate</span>
+                                    </button>
+                                </div>
                                 <ExportDropdown topic={result.topic} explanations={result.explanations} />
                             </div>
 
@@ -187,6 +209,8 @@ export default function AppPage() {
                     © 2026 KnowBear
                 </footer>
             </div>
+
+            <UpgradeModal isOpen={showPremiumModal} onClose={() => setShowPremiumModal(false)} />
         </div>
     )
 }

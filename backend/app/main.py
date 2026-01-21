@@ -13,6 +13,16 @@ from app.services.inference import close_client
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """App lifespan: startup/shutdown."""
+    from app.services.model_provider import ModelProvider
+    
+    # Initialize models
+    provider = ModelProvider.get_instance()
+    await provider.initialize()
+    
+    # Safe logging
+    print(f"Startup: Gemini {'Available' if provider.gemini_configured else 'Not Configured'}")
+    print(f"Startup: Gemma {'Available' if provider.gemma_token else 'Not Configured'}")
+    
     yield
     await asyncio.gather(close_redis(), close_client())
 

@@ -9,6 +9,9 @@ PROMPTS: dict[str, str] = {
     "technical": "Technical explanation of {topic}: key concepts, equations if relevant. Output in plain text only, no markdown, no bolding, no headers. Just paragraphs.",
     "systemic": "Describe {topic} as an interconnected system: main components and relationships. Output in plain text only, no markdown, no bolding, no headers. Just paragraphs.",
     "diagram": "Create Mermaid.js flowchart for {topic}: nodes=components, edges=relationships. Output ONLY valid mermaid code.",
+    "classic60": "Explain {topic} to a 60-year-old using classic metaphors like a checkbook, newspaper, or TV Guide. Slower pace, clear language. Output in plain text only.",
+    "gentle70": "Explain {topic} to a 70-year-old with extreme patience. Use familiar examples like a rotary phone, drive-in movies, or a party line. Output in plain text only.",
+    "warm80": "Explain {topic} to an 80-year-old with the warmest possible tone. Use ultra-basic analogies like baking bread or gardening. Output in plain text only.",
 }
 
 JUDGE_PROMPT = """Rate these responses for "{topic}" on coherence (1-5), accuracy (1-5), conciseness (1-5).

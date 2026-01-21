@@ -14,8 +14,16 @@ async def close_client():
     await _client.aclose()
 
 
-async def call_model(model: str, prompt: str, max_tokens: int = 1024) -> str:
-    """Call Groq API with given model and prompt."""
+async def call_model(model: str, prompt: str, max_tokens: int = 1024, **kwargs) -> str:
+    """Call API with given model and prompt."""
+    
+    # Check for new models first
+    if model in ["gemini", "gemma"]:
+        from app.services.model_provider import ModelProvider
+        provider = ModelProvider.get_instance()
+        return await provider.generate_text(model, prompt, **kwargs)
+        
+    # Fallback to Groq for everything else
     settings = get_settings()
     headers = {
         "Authorization": f"Bearer {settings.groq_api_key}",

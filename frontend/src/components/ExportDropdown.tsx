@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { exportExplanations } from '../api'
+import { useUsageGate } from '../hooks/useUsageGate'
+import { Lock } from 'lucide-react'
 import type { ExportRequest } from '../types'
 
 interface ExportDropdownProps {
@@ -18,6 +20,7 @@ export default function ExportDropdown({ topic, explanations }: ExportDropdownPr
     const [isOpen, setIsOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
+    const { checkAction, isPro } = useUsageGate()
 
     // Close on click outside
     useEffect(() => {
@@ -31,8 +34,15 @@ export default function ExportDropdown({ topic, explanations }: ExportDropdownPr
     }, [])
 
     const handleExport = async (format: 'txt' | 'json' | 'pdf' | 'md') => {
-        setLoading(true)
         setIsOpen(false)
+
+        const actionKey = format === 'pdf' ? 'export_pdf' : format === 'md' ? 'export_md' : undefined
+        if (actionKey) {
+            const allowed = checkAction(actionKey)
+            if (!allowed) return
+        }
+
+        setLoading(true)
         try {
             const req: ExportRequest = { topic, explanations, format }
             const blob = await exportExplanations(req)
@@ -73,13 +83,17 @@ export default function ExportDropdown({ topic, explanations }: ExportDropdownPr
                         <button
                             key={fmt}
                             onClick={() => handleExport(fmt)}
-                            className="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-dark-700 hover:text-white transition-colors"
+                            className="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-dark-700 hover:text-white transition-colors flex items-center justify-between"
                         >
-                            {EXPORT_LABELS[fmt]}
+                            <span>{EXPORT_LABELS[fmt]}</span>
+                            {/* Visual lock for paywalled formats if not pro */}
+                            {!isPro && (fmt === 'pdf' || fmt === 'md') && (
+                                <Lock size={14} className="text-yellow-500" />
+                            )}
                         </button>
                     ))}
                 </div>
             )}
-        </div>
+        </div >
     )
 }

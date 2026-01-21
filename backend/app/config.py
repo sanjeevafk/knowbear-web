@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     """Application settings loaded from environment."""
 
     groq_api_key: str = ""
+    kaggle_api_token: str = ""
+    gemini_api_key: str = ""
     redis_url: str = "redis://localhost:6379"
     cache_ttl: int = 86400  # 24 hours
 
