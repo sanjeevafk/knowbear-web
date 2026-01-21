@@ -159,8 +159,8 @@ export default function AppPage() {
                             </div>
 
                             <div className="flex flex-col md:flex-row md:justify-between gap-4">
-                                <ExportDropdown topic={result.topic} explanations={result.explanations} />
                                 <LevelDropdown selected={selectedLevel} onChange={setSelectedLevel} />
+                                <ExportDropdown topic={result.topic} explanations={result.explanations} />
                             </div>
 
                             {fetchingLevels.has(selectedLevel) ? (
