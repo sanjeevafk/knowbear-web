@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     redis_url: str = "redis://localhost:6379"
     cache_ttl: int = 86400  # 24 hours
+    rate_limit_per_user: int = 20  # Requests per minute
+    rate_limit_burst: int = 5
     supabase_url: str = ""
     supabase_anon_key: str = ""
 

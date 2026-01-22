@@ -1,9 +1,10 @@
 """Redis caching service."""
 
-import json
+import orjson
 from typing import Any
 import redis.asyncio as redis
 from app.config import get_settings
+from app.logging import logger
 
 _client: redis.Redis | None = None
 
@@ -13,7 +14,8 @@ async def get_redis() -> redis.Redis:
     global _client
     if _client is None:
         settings = get_settings()
-        _client = redis.from_url(settings.redis_url, decode_responses=True)
+        # Decode responses=False for orjson (bytes)
+        _client = redis.from_url(settings.redis_url, decode_responses=False)
     return _client
 
 
@@ -22,8 +24,10 @@ async def cache_get(key: str) -> dict[str, Any] | None:
     try:
         r = await get_redis()
         val = await r.get(key)
-        return json.loads(val) if val else None
-    except Exception:
+        # orjson.loads takes bytes directly
+        return orjson.loads(val) if val else None
+    except Exception as e:
+        logger.warning("cache_get_failed", key=key, error=str(e))
         return None
 
 
@@ -32,9 +36,11 @@ async def cache_set(key: str, value: dict[str, Any], ttl: int | None = None) -> 
     try:
         r = await get_redis()
         settings = get_settings()
-        await r.setex(key, ttl or settings.cache_ttl, json.dumps(value))
+        # orjson.dumps returns bytes
+        await r.setex(key, ttl or settings.cache_ttl, orjson.dumps(value))
         return True
-    except Exception:
+    except Exception as e:
+        logger.error("cache_set_failed", key=key, error=str(e))
         return False
 
 

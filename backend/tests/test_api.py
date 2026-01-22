@@ -2,6 +2,13 @@
 
 from fastapi.testclient import TestClient
 from app.main import app
+from app.auth import verify_token
+
+# Mock auth
+async def mock_verify_token():
+    return {"id": "test-user", "email": "test@example.com"}
+
+app.dependency_overrides[verify_token] = mock_verify_token
 
 client = TestClient(app)
 
@@ -10,7 +17,9 @@ def test_health():
     """Health endpoint returns ok."""
     resp = client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert "dependencies" in data
 
 
 def test_pinned():

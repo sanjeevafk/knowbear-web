@@ -20,6 +20,7 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
         ...options,
         headers,
     })
+    if (res.status === 429) throw new Error('You are sending requests too quickly. Please wait a moment.')
     if (!res.ok) throw new Error(`API error: ${res.status}`)
     return res.json()
 }

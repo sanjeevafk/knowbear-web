@@ -2,10 +2,13 @@ from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
 from app.config import get_settings
+from functools import lru_cache
 
 security = HTTPBearer()
 
+@lru_cache
 def get_supabase() -> Client:
+    """Get or create Supabase client (Singleton)."""
     settings = get_settings()
     if not settings.supabase_url or not settings.supabase_anon_key:
         raise HTTPException(status_code=500, detail="Supabase not configured on server")
