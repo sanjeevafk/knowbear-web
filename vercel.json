@@ -29,5 +29,19 @@
             "src": "/(.*)",
             "dest": "/frontend/index.html"
         }
-    ]
+    ],
+    "functions": {
+        "api/index.py": {
+            "includeFiles": [
+                "requirements.txt",
+                "backend/**"
+            ],
+            "excludeFiles": [
+                "**/__pycache__/**",
+                "**/*.pyc",
+                "**/tests/**",
+                "**/*.test.py"
+            ]
+        }
+    }
 }
