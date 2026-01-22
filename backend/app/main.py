@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import structlog
 from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -54,9 +55,6 @@ async def lifespan(app: FastAPI):
     yield
     await asyncio.gather(close_redis(), close_client())
 
-@app.get("/{path:path}")
-async def catch_all(path: str):
-    return {"message": f"Catch-all route hit: /{path}", "status": "Backend is running!"}
 
 app = FastAPI(
     title="KnowBear API",
@@ -178,6 +176,12 @@ async def model_error_handler(request: Request, exc: ModelError):
 app.include_router(pinned.router, prefix="/api")
 app.include_router(query.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
+
+
+# Catch-all route for debugging (should be last)
+@app.get("/{path:path}")
+async def catch_all(path: str):
+    return {"message": f"Catch-all route hit: /{path}", "status": "Backend is running!"}
 
 
 @app.get("/health", tags=["health"])
