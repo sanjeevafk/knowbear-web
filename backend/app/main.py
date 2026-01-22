@@ -184,7 +184,7 @@ async def catch_all(path: str):
     return {"message": f"Catch-all route hit: /{path}", "status": "Backend is running!"}
 
 
-@app.get("/health", tags=["health"])
+@app.get("/api/health", tags=["health"])
 async def health():
     """Health check with dependency status."""
     status = {
