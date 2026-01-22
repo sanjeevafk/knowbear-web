@@ -8,8 +8,10 @@ export interface QueryRequest {
     topic: string
     levels?: string[]
     premium?: boolean
-    mode?: 'fast' | 'ensemble'
+    mode?: 'fast' | 'ensemble' | 'brief_dive'
 }
+
+export type Mode = 'fast' | 'ensemble' | 'brief_dive'
 
 export interface QueryResponse {
     topic: string

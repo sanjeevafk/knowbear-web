@@ -18,7 +18,7 @@ export default function AppPage() {
     const [result, setResult] = useState<QueryResponse | null>(null)
     const [selectedLevel, setSelectedLevel] = useState<Level>('eli5')
     const [error, setError] = useState<string | null>(null)
-    const [mode, setMode] = useState<'fast' | 'ensemble'>('fast')
+    const [mode, setMode] = useState<'fast' | 'ensemble' | 'brief_dive'>('brief_dive')
     const [fetchingLevels, setFetchingLevels] = useState<Set<Level>>(new Set())
 
     const { checkAction, recordAction, showPremiumModal, setShowPremiumModal } = useUsageGate()
@@ -143,6 +143,37 @@ export default function AppPage() {
                 </header>
 
                 <main className="space-y-8 flex-grow">
+                    {!result && !loading && (
+                        <section className="bg-dark-800/50 backdrop-blur-sm border border-dark-700 rounded-2xl p-6">
+                            <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                                <span>🔥</span> Frequently Searched
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                {[
+                                    { topic: 'blockchain', icon: '🔗', description: 'Distributed ledger technology' },
+                                    { topic: 'quantum computing', icon: '⚛️', description: 'Quantum mechanics in computing' },
+                                    { topic: 'artificial intelligence', icon: '🤖', description: 'Machine learning & neural networks' },
+                                    { topic: 'climate change', icon: '🌍', description: 'Environmental science' },
+                                    { topic: 'cryptocurrency', icon: '💰', description: 'Bitcoin, Ethereum & NFTs' },
+                                    { topic: 'space exploration', icon: '🚀', description: 'SpaceX, NASA & beyond' },
+                                ].map(({ topic, icon, description }) => (
+                                    <button
+                                        key={topic}
+                                        onClick={() => handleSearch(topic)}
+                                        disabled={loading}
+                                        className="group flex flex-col items-start gap-2 p-4 bg-dark-700/50 hover:bg-dark-700 border border-dark-600 hover:border-cyan-500/50 rounded-xl transition-all text-left"
+                                    >
+                                        <span className="text-2xl">{icon}</span>
+                                        <div className="flex flex-col">
+                                            <span className="text-white font-medium text-sm group-hover:text-cyan-400 transition-colors">{topic}</span>
+                                            <span className="text-gray-400 text-xs">{description}</span>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
                     <SearchBar
                         onSearch={handleSearch}
                         loading={loading}

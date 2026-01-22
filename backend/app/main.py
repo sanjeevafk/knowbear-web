@@ -1,11 +1,13 @@
 """FastAPI main application."""
 
 import asyncio
+import os
+from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi_limiter import FastAPILimiter
+from fastapi_limiter2 import FastAPILimiter
 from app.routers import pinned, query, export
 from app.services.cache import close_redis, get_redis
 from app.services.inference import close_client
@@ -28,8 +30,18 @@ async def lifespan(app: FastAPI):
         logger.info("redis_connected_rate_limiter_init")
     except Exception as e:
         logger.error("redis_connection_failed", error=str(e))
-        # We might want to fail hard here in production, or degrade gracefully?
-        # For now, log error.
+
+        # ENFORCE Redis in production
+        is_prod = os.getenv("ENVIRONMENT") == "production"
+        if is_prod:
+            raise RuntimeError(
+                "CRITICAL: Redis connection failed in production. "
+                "Rate limiting is disabled without Redis. "
+                "Please ensure REDIS_URL is set to a valid Redis instance. "
+                "Use Redis Cloud (https://redis.com/try-free) for free tier."
+            ) from e
+        else:
+            logger.warning("redis_unavailable_dev_mode_continuing", error=str(e))
 
     # Initialize models
     provider = ModelProvider.get_instance()
@@ -50,13 +62,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# Get allowed origins from environment (production safety)
+allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000"  # Development default
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to strictly the Vercel app URL
+    allow_origins=[origin.strip() for origin in allowed_origins],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["content-type", "authorization"],
+    max_age=3600,
 )
 
 
@@ -159,27 +177,39 @@ app.include_router(query.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 
 
-@app.get("/health")
+@app.get("/health", tags=["health"])
 async def health():
     """Health check with dependency status."""
-    status = {"status": "ok", "dependencies": {}}
-    
+    status = {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": os.getenv("ENVIRONMENT", "unknown"),
+    }
+
+    # Check Redis (CRITICAL for rate limiting)
+    try:
+        r = await get_redis()
+        await r.ping()
+        status["redis"] = "✓ healthy"
+    except Exception as e:
+        status["redis"] = f"✗ error: {str(e)}"
+        # Return 503 if Redis fails in production
+        is_prod = os.getenv("ENVIRONMENT") == "production"
+        if is_prod:
+            return JSONResponse(status_code=503, content=status)
+
     # Check Google Generative AI
     try:
         import google.generativeai as genai
-        status["dependencies"]["google-generativeai"] = f"installed ({genai.__version__})"
-    except ImportError:
-        status["dependencies"]["google-generativeai"] = "missing"
+        status["google_generativeai"] = "✓ installed"
     except Exception as e:
-        status["dependencies"]["google-generativeai"] = f"error: {str(e)}"
-        
+        status["google_generativeai"] = f"✗ {str(e)}"
+
     # Check FPDF
     try:
         import fpdf
-        status["dependencies"]["fpdf2"] = f"installed ({fpdf.__version__})"
-    except ImportError:
-        status["dependencies"]["fpdf2"] = "missing"
+        status["fpdf2"] = "✓ installed"
     except Exception as e:
-        status["dependencies"]["fpdf2"] = f"error: {str(e)}"
+        status["fpdf2"] = f"✗ {str(e)}"
 
     return status

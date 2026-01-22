@@ -83,12 +83,47 @@ cd frontend
 npm run build
 ```
 
-## Deployment (Vercel)
+## Deployment (Render)
 
-1. Push to GitHub
-2. Import in Vercel
-3. Set environment variables in Vercel dashboard
-4. Deploy
+### Prerequisites
+- GitHub account
+- Render account (https://render.com)
+- Redis instance (free:  https://redis.com/try-free/)
+
+### Steps
+
+1. **Push to GitHub**:
+   ```bash
+   git add -A
+   git commit -m "deployment: prepare for Render"
+   git push origin main
+   ```
+
+2. **Deploy Backend API**:
+   - Go to https://dashboard.render.com
+   - Click "New+" → "Web Service"
+   - Connect GitHub repo:  `voidcommit-afk/KnowBear`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+   - Click "Create Web Service"
+
+3. **Set Environment Variables** (in Render Dashboard):
+   ```
+   ENVIRONMENT=production
+   REDIS_URL=<your-redis-url>
+   GROQ_API_KEY=<your-groq-key>
+   GEMINI_API_KEY=<your-gemini-key>
+   SUPABASE_URL=<your-supabase-url>
+   SUPABASE_ANON_KEY=<your-anon-key>
+   ALLOWED_ORIGINS=https://<your-domain>.onrender.com
+   ```
+
+4. **Verify Deployment**:
+   ```bash
+   curl https://<your-service>.onrender.com/health
+   ```
+
+See `.env.example` for complete list of required variables.
 
 ## API Endpoints
 
