@@ -6,8 +6,7 @@ from config import get_settings
 from prompts import PROMPTS
 from logging_config import logger
 
-# Global client removed as we use ModelProvider now
-# GROQ_URL removed
+
 
 async def close_client():
     """No-op as ModelProvider manages its own clients."""
@@ -26,12 +25,10 @@ async def call_model(model: str, prompt: str, max_tokens: int = 1024, **kwargs) 
     
     provider = ModelProvider.get_instance()
     
-    # Determine task type based on model or content if not explicitly passed
     task = kwargs.get("task", "general")
     if model in ["llama-3.3-70b-versatile", "deep_dive"]:
          task = "coding"
             
-    # Delegate to the intelligent router
     try:
         result = await provider.route_inference(
             prompt=prompt, 

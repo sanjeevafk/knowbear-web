@@ -23,9 +23,7 @@ async def lifespan(app: FastAPI):
     """App lifespan: startup/shutdown."""
     setup_logging()
     
-    # Initialize Redis for Rate Limiting
     r = await get_redis()
-    # verify redis connection
     try:
         await r.ping()
         await FastAPILimiter.init(r)
@@ -42,7 +40,6 @@ async def lifespan(app: FastAPI):
         else:
             logger.warning("redis_unavailable_dev_mode_continuing", error=str(e))
 
-    # Initialize models
     provider = ModelProvider.get_instance()
     await provider.initialize()
     
@@ -60,7 +57,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Get allowed origins from environment (production safety)
 allowed_origins = os.getenv(
     "ALLOWED_ORIGINS",
     "*" 
@@ -81,7 +77,6 @@ async def security_headers(request: Request, call_next):
     """Add security headers to all responses."""
     response = await call_next(request)
     
-    # Content Security Policy (CSP)
     csp = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live; " 
@@ -168,41 +163,25 @@ async def model_error_handler(request: Request, exc: ModelError):
     )
 
 
-# Mount routers
 app.include_router(pinned.router, prefix="/api")
-# Conditional Rate Limiter Dependency
+
 async def conditional_rate_limit(request: Request, response: Response):
     """
     Apply rate limiting ONLY if Redis is available.
     In development (when Redis fails), this becomes a no-op.
     """
-    # Check if FastAPILimiter was successfully initialized
     try:
-        # Check if redis pool is ready (rudimentary check)
-        # FastAPILimiter stores the redis instance in its internals, 
-        # but the simplest check is if we are in dev mode and redis failed.
-        # However, FastAPILimiter doesn't expose a simple "is_ready" flag globally.
-        # A safer approach: Catch the error if Limiter fails.
-        
-        # Actually, the RateLimiter dependency itself is what throws the error.
-        # We can construct the dependency dynamically.
-        
         if os.getenv("ENVIRONMENT") == "production":
-             # Enforce in production
              await RateLimiter(times=get_settings().rate_limit_per_user, seconds=60)(request, response)
         else:
-            # In Dev: Try to use it, but pass if it fails or isn't init
             try:
                 await RateLimiter(times=get_settings().rate_limit_per_user, seconds=60)(request, response)
             except Exception:
-                # Redis not connected? Pass through.
                 pass
-                
     except Exception:
-        # Failsafe
         pass
 
-# Mount routers
+
 app.include_router(pinned.router, prefix="/api")
 app.include_router(
     query.router, 
@@ -227,26 +206,22 @@ async def health():
         "environment": os.getenv("ENVIRONMENT", "unknown"),
     }
 
-    # Check Redis (CRITICAL for rate limiting)
     try:
         r = await get_redis()
         await r.ping()
         status["redis"] = "✓ healthy"
     except Exception as e:
         status["redis"] = f"✗ error: {str(e)}"
-        # Return 503 if Redis fails in production
         is_prod = os.getenv("ENVIRONMENT") == "production"
         if is_prod:
             return JSONResponse(status_code=503, content=status)
 
-    # Check Google GenAI
     try:
         from google import genai
         status["google_genai"] = "✓ installed"
     except Exception as e:
         status["google_genai"] = f"✗ {str(e)}"
 
-    # Check FPDF
     try:
         import fpdf
         status["fpdf2"] = "✓ installed"

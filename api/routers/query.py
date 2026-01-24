@@ -33,10 +33,8 @@ class QueryResponse(BaseModel):
 async def query_topic(req: QueryRequest) -> QueryResponse:
     """Generate explanations for a topic."""
     
-    # Gating Logic: Enforce Premium for 'ensemble' mode
-    # Gating Logic: Enforce Premium for 'ensemble' and 'technical_depth' mode
+    # Gating: Enforce Premium for 'ensemble'/'technical_depth', downgrading to 'fast' if needed (UX decision)
     if (req.mode == "ensemble" or req.mode == "technical_depth") and not req.premium:
-        # Soft enforcement (UX decision): Downgrade to 'fast'
         req.mode = "fast"  
 
     try:
@@ -44,17 +42,14 @@ async def query_topic(req: QueryRequest) -> QueryResponse:
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    # Gating Logic: Filter levels based on premium status
     allowed_levels = FREE_LEVELS + (PREMIUM_LEVELS if req.premium else [])
     
-    # Filter requested levels against allowed
     levels = [l for l in req.levels if l in allowed_levels]
     
     # If no valid levels remain (e.g. user requested only premium levels but is free), default to eli5
     if not levels:
         levels = ["eli5"]
 
-    # Check cache first (unless bypassed)
     explanations: dict[str, str] = {}
     uncached: list[str] = []
     
@@ -67,13 +62,11 @@ async def query_topic(req: QueryRequest) -> QueryResponse:
             else:
                 uncached.append(lvl)
     else:
-        # If bypassing cache, treat all levels as uncached
         uncached = levels
 
     if not uncached and not req.bypass_cache:
         return QueryResponse(topic=topic, explanations=explanations, cached=True)
 
-    # Generate missing levels in parallel
     tasks = {lvl: ensemble_generate(topic, lvl, req.premium, req.mode) for lvl in uncached}
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 

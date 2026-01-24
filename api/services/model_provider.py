@@ -29,7 +29,7 @@ class ModelProvider:
         self.groq_client = None
         self.gemini_configured = False
         
-        # Initialize Clients immediately if keys are available in env/settings
+
         if self.settings.gemini_api_key:
              try:
                 self.gemini_client = genai.Client(api_key=self.settings.gemini_api_key)
@@ -43,7 +43,7 @@ class ModelProvider:
             except Exception as e:
                 print(f"Groq init failed: {e}")
         
-        # Hugging Face Token for raw HTTP calls
+
         self.hf_token = os.getenv("HF_TOKEN")
 
     @classmethod
@@ -75,11 +75,8 @@ class ModelProvider:
                  raise ModelUnavailable("Gemini is not configured for heavy/visual tasks.")
             
             model_name = "gemini-2.0-flash" if image_data else "gemini-2.0-flash-lite-preview-02-05"
-            # Note: Checking newer models if available, sticking to known reliable ones for now but updating if possible.
-            # Reverting to known working config from user code if needed, but 'gemini-2.5' seemed like a hallucinations.
-            # Stick to user's "gemini-2.5" naming convention if they defined it elsewhere, but standard is 1.5 or 2.0.
-            # User had "gemini-2.5-flash" -- assuming this is a custom endpoint or future alias. Keeping consistent.
-            model_name = "gemini-2.0-flash" if image_data else "gemini-2.0-flash" # Standardizing
+            # Standardize model names; 'gemini-2.5' was a placeholder.
+            model_name = "gemini-2.0-flash" if image_data else "gemini-2.0-flash"
 
             try:
                 contents = [prompt]
@@ -114,7 +111,7 @@ class ModelProvider:
         target_model = "llama-3.1-8b-instant" 
         
         if "deep" in task.lower() or "gpt-oss" in str(kwargs.get("model", "")).lower():
-             target_model = "llama-3.3-70b-versatile" # mapped for quality
+             target_model = "llama-3.3-70b-versatile"
         
         elif task == "coding":
             target_model = "llama-3.3-70b-versatile"
@@ -150,7 +147,6 @@ class ModelProvider:
         1. Phi-3 (HF Serverless via HTTPX)
         2. Gemini Flash Lite (Google)
         """
-        # Step 1: Phi-3 (Hugging Face)
         if self.hf_token:
             try:
                 async with httpx.AsyncClient() as client:
@@ -171,7 +167,6 @@ class ModelProvider:
             except Exception as e:
                 print(f"Phi-3 Fallback Failed: {repr(e)}")
 
-        # Step 2: Gemini (Google)
         return await self._fallback_to_gemini(prompt)
 
     async def _fallback_to_gemini(self, prompt: str) -> dict:

@@ -20,7 +20,6 @@ class ExportRequest(BaseModel):
 @router.post("/export")
 async def export_explanations(req: ExportRequest) -> StreamingResponse:
     """Export explanations in requested format."""
-    # Gate all export features
     if not req.premium:
         raise HTTPException(status_code=403, detail="Exporting is a premium feature. Please upgrade to use this functionality.")
 
@@ -75,7 +74,6 @@ async def export_explanations(req: ExportRequest) -> StreamingResponse:
                 pdf.multi_cell(0, 6, safe_text)
                 pdf.ln(10)
 
-            # Output to buffer
             pdf_bytes = pdf.output()
             if isinstance(pdf_bytes, (bytes, bytearray)):
                 buf = io.BytesIO(pdf_bytes)
