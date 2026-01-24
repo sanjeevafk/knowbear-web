@@ -1,6 +1,4 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useGuestMode } from '../hooks/useGuestMode';
 
 export type ActionType = 'search' | 'export_data' | 'premium_mode';
 
@@ -18,8 +16,6 @@ export interface UsageGateContextType {
 const UsageGateContext = createContext<UsageGateContextType | undefined>(undefined);
 
 export function UsageGateProvider({ children }: { children: ReactNode }) {
-    const { user } = useAuth();
-    const guestMode = useGuestMode();
     const [showPremiumModal, setShowPremiumModal] = useState(false);
 
     // Daily Reset Logic
