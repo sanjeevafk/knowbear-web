@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { queryTopic } from '../api'
 import type { QueryResponse, Level, Mode } from '../types'
-import { FREE_LEVELS } from '../types'
 import SearchBar from '../components/SearchBar'
 import LevelDropdown from '../components/LevelDropdown'
 import ExplanationCard from '../components/ExplanationCard'
@@ -9,7 +8,9 @@ import ExportDropdown from '../components/ExportDropdown'
 import Spinner from '../components/Spinner'
 import { useUsageGate } from '../hooks/useUsageGate'
 import { UpgradeModal } from '../components/UpgradeModal'
-import { RefreshCcw } from 'lucide-react'
+import { LoginButton } from '../components/LoginButton'
+import { RefreshCcw, User, Crown } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 export default function AppPage() {
     // const [pinned, setPinned] = useState<PinnedTopic[]>([])
@@ -20,7 +21,8 @@ export default function AppPage() {
     const [mode, setMode] = useState<Mode>('fast')
     const [fetchingLevels, setFetchingLevels] = useState<Set<Level>>(new Set())
 
-    const { checkAction, recordAction, showPremiumModal, setShowPremiumModal } = useUsageGate()
+    const { user } = useAuth()
+    const { checkAction, recordAction, showPremiumModal, setShowPremiumModal, isPro } = useUsageGate()
 
     // Use a ref to track current search topic to avoid race conditions
     const currentTopicRef = useRef<string | null>(null)
@@ -76,7 +78,10 @@ export default function AppPage() {
         // Determine actual mode to use (Downgrade if needed)
         const effectiveMode = downgraded ? 'fast' : mode
 
-        recordAction('search', mode)
+        // Only record action if it's a new search (not a forced refresh/regenerate)
+        if (!forceRefresh) {
+            recordAction('search', mode)
+        }
 
         setLoading(true)
         setError(null)
@@ -96,14 +101,8 @@ export default function AppPage() {
             if (currentTopicRef.current === topic) {
                 setResult(res)
 
-                // Background fetch others if in fast mode (or downgraded to fast) to pre-cache
-                if (effectiveMode === 'fast') {
-                    FREE_LEVELS.forEach(lvl => {
-                        if (lvl !== selectedLevel) {
-                            fetchLevel(topic, lvl)
-                        }
-                    })
-                }
+                // OPTIMIZATION: Removed aggressive pre-fetching of all levels to save tokens/costs.
+                // Levels will be lazy-loaded only when the user selects them via fetchLevel useEffect.
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to generate')
@@ -147,6 +146,21 @@ export default function AppPage() {
                         </h1>
                     </button>
                     <p className="text-gray-400 mt-2 text-lg">AI-powered explanations for any topic</p>
+
+                    {/* User Status Badge */}
+                    <div className="absolute top-4 right-4 md:top-8 md:right-8 flex flex-col items-end gap-2">
+                        {!user ? (
+                            <div className="flex items-center gap-3">
+                                <span className="text-gray-400 text-sm hidden md:inline">Guest User</span>
+                                <LoginButton className="!py-1.5 !px-4 text-xs bg-dark-700/50 hover:bg-dark-600 text-white border-dark-600 shadow-none hover:shadow-lg" />
+                            </div>
+                        ) : (
+                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${isPro ? 'bg-amber-500/10 border-amber-500/50 text-amber-400' : 'bg-daark-700/50 border-dark-600 text-gray-400'}`}>
+                                {isPro ? <Crown size={14} /> : <User size={14} />}
+                                <span className="text-xs font-medium">{isPro ? 'Pro User' : 'Free User'}</span>
+                            </div>
+                        )}
+                    </div>
                 </header>
 
                 <main className="space-y-8 flex-grow">

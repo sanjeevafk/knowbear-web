@@ -21,10 +21,23 @@ export function UsageGateProvider({ children }: { children: ReactNode }) {
     const { user } = useAuth();
     const guestMode = useGuestMode();
     const [showPremiumModal, setShowPremiumModal] = useState(false);
+
+    // Daily Reset Logic
     const [deepDiveUsageCount, setDeepDiveUsageCount] = useState(() => {
+        const storedDate = localStorage.getItem('deep_dive_date');
+        const today = new Date().toDateString();
+
+        if (storedDate !== today) {
+            // New day, reset count
+            localStorage.setItem('deep_dive_date', today);
+            localStorage.setItem('deep_dive_usage', '0');
+            return 0;
+        }
+
         const stored = localStorage.getItem('deep_dive_usage');
         return stored ? parseInt(stored, 10) : 0;
     });
+
     const [hasSeenLimitPopup, setHasSeenLimitPopup] = useState(false);
 
     const DEEP_DIVE_LIMIT = 5;
@@ -49,15 +62,13 @@ export function UsageGateProvider({ children }: { children: ReactNode }) {
 
         // SEARCH logic
         if (action === 'search') {
-            // Guest check (Global Limit)
-            if (!user) {
-                if (guestMode.checkLimit()) {
-                    // guest mode hook handles its own modal
-                    return { allowed: false };
-                }
+            // UNLIMITED FAST MODE FOR EVERYONE (Guest & Free)
+            if (mode === 'fast') {
+                return { allowed: true };
             }
 
             // Soft Gate: Deep Dive
+            // Both Guest and Free users share this limit logic
             if (mode === 'deep_dive') {
                 if (deepDiveUsageCount >= DEEP_DIVE_LIMIT) {
                     if (!hasSeenLimitPopup) {
@@ -74,13 +85,14 @@ export function UsageGateProvider({ children }: { children: ReactNode }) {
 
     const recordAction = (action: ActionType, mode: string = 'fast') => {
         if (action === 'search') {
-            if (!user) {
-                guestMode.incrementUsage();
-            }
+            // We no longer track generic "guest usage" for limits since Fast mode is unlimited.
+            // Only track Deep Dive usage.
             if (mode === 'deep_dive' && !isPro) {
                 const newCount = deepDiveUsageCount + 1;
                 setDeepDiveUsageCount(newCount);
                 localStorage.setItem('deep_dive_usage', newCount.toString());
+                // Update date just in case
+                localStorage.setItem('deep_dive_date', new Date().toDateString());
             }
         }
     };

@@ -80,9 +80,9 @@ const UpgradeContent: React.FC<{ onUpgrade: () => void, loading: boolean }> = ({
                     <Lock size={32} />
                 </div>
 
-                <h2 className="text-2xl font-bold text-white mb-2">Guest Limit Reached</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">Want to Go Deeper?</h2>
                 <p className="text-gray-400 mb-6">
-                    You've reached the free usage limit for guest users. Sign in to continue utilizing KnowBear without interruptions.
+                    You've hit your daily limit of 5 Deep Dives. Sign in now to secure your <strong>5 Daily Deep Dives</strong> and save your research history!
                 </p>
 
                 <div className="w-full">
@@ -102,9 +102,9 @@ const UpgradeContent: React.FC<{ onUpgrade: () => void, loading: boolean }> = ({
                 <Star size={32} fill="currentColor" />
             </div>
 
-            <h2 className="text-2xl font-bold text-white mb-2">Unlock Premium Features</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">Unlock Pro Powers</h2>
             <p className="text-gray-400 mb-6">
-                Exporting only available to Pro users. Upgrade now to unlock PDF/Markdown exports and unlimited usage.
+                You're exploring some advanced territory! Features like Exporting and unlimited Deep Dives are available to our Pro supporters.
             </p>
 
             <div className="w-full">
