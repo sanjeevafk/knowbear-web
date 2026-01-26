@@ -19,13 +19,13 @@ export interface UsageGateContextType {
 const UsageGateContext = createContext<UsageGateContextType | undefined>(undefined);
 
 export function UsageGateProvider({ children }: { children: ReactNode }) {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const guestMode = useGuestMode();
     const [showPremiumModal, setShowPremiumModal] = useState(false);
     const [paywallContext, setPaywallContext] = useState<{ mode?: string, action?: ActionType } | null>(null);
 
-    // For MVP, simplistic check
-    const isPro = localStorage.getItem('knowbear_pro_status') === 'true';
+    // Use profile status directly as source of truth, fallback to localStorage for instant load
+    const isPro = profile?.is_pro === true || localStorage.getItem('knowbear_pro_status') === 'true';
 
     const checkAction = (
         action: ActionType,
