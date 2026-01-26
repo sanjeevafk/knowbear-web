@@ -9,7 +9,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment."""
 
+    environment: str = "development"
     groq_api_key: str = ""
+
     kaggle_api_token: str = ""
     gemini_api_key: str = ""
     redis_url: str = "redis://localhost:6379"
@@ -21,7 +23,8 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
 
     class Config:
-        env_file = ".env"
+        env_file = (".env", "../.env")
+
         env_file_encoding = "utf-8"
         extra = "ignore"
 

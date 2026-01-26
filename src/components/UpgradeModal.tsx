@@ -71,54 +71,70 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose }) =
 };
 
 const UpgradeContent: React.FC<{ onUpgrade: () => void, loading: boolean }> = ({ onUpgrade, loading }) => {
-    const { user } = useAuth(); // We need to move useAuth import up or pass it
+    const { user } = useAuth();
+    const { paywallContext } = useUsageGate();
 
-    if (!user) {
-        return (
-            <div className="flex flex-col items-center text-center mt-2">
-                <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4 text-blue-400">
-                    <Lock size={32} />
-                </div>
+    const getMessage = () => {
+        if (!user) {
+            return {
+                title: "Guest Limit Reached",
+                body: "You've reached the free usage limit for guest users. Sign in to continue utilizing KnowBear without interruptions.",
+                icon: <Lock size={32} />
+            };
+        }
 
-                <h2 className="text-2xl font-bold text-white mb-2">Guest Limit Reached</h2>
-                <p className="text-gray-400 mb-6">
-                    You've reached the free usage limit for guest users. Sign in to continue utilizing KnowBear without interruptions.
-                </p>
+        // Contextual messaging
+        if (paywallContext?.mode === 'ensemble' && paywallContext?.action === 'export_data') {
+            return {
+                title: "Unlock PDF Export in Ensemble Mode",
+                body: "Export your ensemble results as PDF with full formatting. Upgrade to Pro for unlimited exports and advanced features.",
+                icon: <Star size={32} fill="currentColor" />
+            };
+        }
 
-                <div className="w-full">
-                    <LoginButton className="w-full justify-center py-3 text-lg" />
-                </div>
+        if (paywallContext?.action === 'premium_mode') {
+            const modeName = paywallContext.mode?.replace('_', ' ') || 'Premium';
+            return {
+                title: `Unlock ${modeName.charAt(0).toUpperCase() + modeName.slice(1)} Mode`,
+                body: `Get better, deeper answers with our high-reasoning models. Upgrade to Pro for unlimited access to all modes.`,
+                icon: <Star size={32} fill="currentColor" />
+            };
+        }
 
-                <p className="mt-4 text-xs text-gray-500">
-                    By signing in, you agree to our Terms of Service and Privacy Policy.
-                </p>
-            </div>
-        );
-    }
+        return {
+            title: "Unlock Premium Features",
+            body: "Exporting only available to Pro users. Upgrade now to unlock PDF/Markdown exports and unlimited usage.",
+            icon: <Star size={32} fill="currentColor" />
+        };
+    };
+
+    const { title, body, icon } = getMessage();
 
     return (
         <div className="flex flex-col items-center text-center mt-2">
-            <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-orange-600 rounded-full flex items-center justify-center mb-4 text-white shadow-lg shadow-orange-500/30">
-                <Star size={32} fill="currentColor" />
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 text-white shadow-lg ${!user ? 'bg-gray-800 text-blue-400' : 'bg-gradient-to-br from-yellow-400 to-orange-600 shadow-orange-500/30'}`}>
+                {icon}
             </div>
 
-            <h2 className="text-2xl font-bold text-white mb-2">Unlock Premium Features</h2>
-            <p className="text-gray-400 mb-6">
-                Exporting only available to Pro users. Upgrade now to unlock PDF/Markdown exports and unlimited usage.
-            </p>
+            <h2 className="text-2xl font-bold text-white mb-2">{title}</h2>
+            <p className="text-gray-400 mb-6">{body}</p>
 
             <div className="w-full">
-                <button
-                    onClick={onUpgrade}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 py-3 text-lg font-bold bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-all disabled:opacity-50"
-                >
-                    {loading ? 'Processing...' : 'Upgrade to Pro - ₹499/mo'}
-                </button>
+                {!user ? (
+                    <LoginButton className="w-full justify-center py-3 text-lg" />
+                ) : (
+                    <button
+                        onClick={onUpgrade}
+                        disabled={loading}
+                        className="w-full flex items-center justify-center gap-2 py-3 text-lg font-bold bg-white text-gray-900 rounded-lg hover:bg-gray-100 transition-all disabled:opacity-50"
+                    >
+                        {loading ? 'Processing...' : 'Upgrade to Pro - ₹499/mo'}
+                    </button>
+                )}
             </div>
 
             <p className="mt-4 text-xs text-gray-500">
-                Secure payment via Razorpay. Cancel anytime.
+                {!user ? 'By signing in, you agree to our Terms of Service.' : 'Secure payment via Razorpay. Cancel anytime.'}
             </p>
         </div>
     );

@@ -3,7 +3,7 @@
 import asyncio
 import json
 import re
-from prompts import JUDGE_PROMPT, JUDGE_MODEL, FREE_MODELS, PREMIUM_MODELS, FAST_MODEL, BRIEF_DIVE_MODELS
+from prompts import JUDGE_PROMPT, JUDGE_MODEL, FREE_MODELS, PREMIUM_MODELS, FAST_MODEL
 from services.inference import call_model, generate_explanation
 
 
@@ -15,13 +15,6 @@ async def ensemble_generate(topic: str, level: str, use_premium: bool = False, m
             return await generate_explanation(topic, level, FAST_MODEL, is_pro=use_premium)
         except Exception as e:
             raise RuntimeError(f"Fast model failed: {e}")
-
-    if mode == "deep_dive":
-        # Deep Dive: single high-quality model (GPT-OSS or DeepSeek)
-        try:
-            return await generate_explanation(topic, level, BRIEF_DIVE_MODELS[0], is_pro=use_premium)
-        except Exception as e:
-            raise RuntimeError(f"Deep Dive model failed: {e}")
 
     models = PREMIUM_MODELS if use_premium else FREE_MODELS
     tasks = [generate_explanation(topic, level, m, is_pro=use_premium) for m in models]
@@ -37,10 +30,12 @@ async def ensemble_generate(topic: str, level: str, use_premium: bool = False, m
 
 async def judge_responses(topic: str, responses: list[str]) -> str:
     """Use judge model to pick best response."""
-    resp_text = "\n".join(f"[{i}]: {r[:500]}" for i, r in enumerate(responses))
+    # Give judge more context - 1500 chars from each response
+    resp_text = "\n".join(f"[{i}]: {r[:1500]}" for i, r in enumerate(responses))
     prompt = JUDGE_PROMPT.format(topic=topic, responses=resp_text)
     try:
-        result = await call_model(JUDGE_MODEL, prompt, max_tokens=100)
+        # Increase tokens for reason
+        result = await call_model(JUDGE_MODEL, prompt, max_tokens=200)
         match = re.search(r'"best"\s*:\s*(\d+)', result)
         idx = int(match.group(1)) if match else 0
         return responses[min(idx, len(responses) - 1)]

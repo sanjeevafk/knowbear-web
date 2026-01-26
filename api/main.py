@@ -18,21 +18,31 @@ from logging_config import setup_logging, logger
 from config import get_settings
 
 
+redis_available = False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
     """App lifespan: startup/shutdown."""
     setup_logging()
     
+    global redis_available
+    redis_available = False
+    
     r = await get_redis()
+
     try:
         await r.ping()
         await FastAPILimiter.init(r)
+        redis_available = True
         logger.info("redis_connected_rate_limiter_init")
     except Exception as e:
+
         logger.error("redis_connection_failed", error=str(e))
 
         # Soften enforcement to prevent total site blackout if Redis is just flapping
-        is_prod = os.getenv("ENVIRONMENT") == "production"
+        is_prod = get_settings().environment == "production"
         if is_prod:
             logger.error("PROD_REDIS_FAILURE_CONTINUING_UNPROTECTED", error=str(e))
             # Site will still run, but rate limiting will be off. 
@@ -47,7 +57,7 @@ async def lifespan(app: FastAPI):
                 gemini_configured=provider.gemini_configured)
     
     yield
-    await asyncio.gather(close_redis(), close_client())
+    await asyncio.gather(close_redis(), close_client(), ModelProvider.get_instance().close())
 
 
 app = FastAPI(
@@ -170,8 +180,11 @@ async def conditional_rate_limit(request: Request, response: Response):
     Apply rate limiting ONLY if Redis is available.
     In development (when Redis fails), this becomes a no-op.
     """
+    if not redis_available:
+        return
+
     try:
-        if os.getenv("ENVIRONMENT") == "production":
+        if get_settings().environment == "production":
              await RateLimiter(times=get_settings().rate_limit_per_user, seconds=60)(request, response)
         else:
             try:
@@ -180,6 +193,7 @@ async def conditional_rate_limit(request: Request, response: Response):
                 pass
     except Exception:
         pass
+
 
 
 app.include_router(pinned.router, prefix="/api")
@@ -198,8 +212,9 @@ async def health():
     status = {
         "status": "ok",
         "timestamp": datetime.utcnow().isoformat(),
-        "environment": os.getenv("ENVIRONMENT", "unknown"),
+        "environment": get_settings().environment,
     }
+
 
     try:
         r = await get_redis()
@@ -207,8 +222,9 @@ async def health():
         status["redis"] = "✓ healthy"
     except Exception as e:
         status["redis"] = f"✗ error: {str(e)}"
-        is_prod = os.getenv("ENVIRONMENT") == "production"
+        is_prod = get_settings().environment == "production"
         if is_prod:
+
             return JSONResponse(status_code=503, content=status)
 
     try:

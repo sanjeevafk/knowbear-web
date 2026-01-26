@@ -9,6 +9,7 @@ export interface UsageGateContextType {
     recordAction: (action: ActionType, mode?: string) => void;
     showPremiumModal: boolean;
     setShowPremiumModal: (show: boolean) => void;
+    paywallContext: { mode?: string, action?: ActionType } | null;
     upgradeToPro: () => void;
     isPro: boolean;
     deepDiveUsageCount: number;
@@ -21,13 +22,7 @@ export function UsageGateProvider({ children }: { children: ReactNode }) {
     const { user } = useAuth();
     const guestMode = useGuestMode();
     const [showPremiumModal, setShowPremiumModal] = useState(false);
-    const [deepDiveUsageCount, setDeepDiveUsageCount] = useState(() => {
-        const stored = localStorage.getItem('deep_dive_usage');
-        return stored ? parseInt(stored, 10) : 0;
-    });
-    const [hasSeenLimitPopup, setHasSeenLimitPopup] = useState(false);
-
-    const DEEP_DIVE_LIMIT = 5;
+    const [paywallContext, setPaywallContext] = useState<{ mode?: string, action?: ActionType } | null>(null);
 
     // For MVP, simplistic check
     const isPro = localStorage.getItem('knowbear_pro_status') === 'true';
@@ -43,28 +38,23 @@ export function UsageGateProvider({ children }: { children: ReactNode }) {
 
         // HARD GATED Features
         if (action === 'premium_mode' || action === 'export_data') {
+            setPaywallContext({ mode, action });
             setShowPremiumModal(true);
             return { allowed: false };
         }
 
         // SEARCH logic
         if (action === 'search') {
-            // Guest check (Global Limit)
-            if (!user) {
-                if (guestMode.checkLimit()) {
-                    // guest mode hook handles its own modal
-                    return { allowed: false };
-                }
+            // Fast mode is indefinite (unlimited) for everyone
+            if (mode === 'fast') {
+                return { allowed: true };
             }
 
-            // Soft Gate: Deep Dive
-            if (mode === 'deep_dive') {
-                if (deepDiveUsageCount >= DEEP_DIVE_LIMIT) {
-                    if (!hasSeenLimitPopup) {
-                        setShowPremiumModal(true);
-                        setHasSeenLimitPopup(true);
-                    }
-                    return { allowed: true, downgraded: true };
+            // Guest check (Global Limit) - only applies to non-fast modes if any are accessible to guests
+            if (!user) {
+                if (guestMode.checkLimit()) {
+                    setShowPremiumModal(true);
+                    return { allowed: false };
                 }
             }
         }
@@ -74,13 +64,9 @@ export function UsageGateProvider({ children }: { children: ReactNode }) {
 
     const recordAction = (action: ActionType, mode: string = 'fast') => {
         if (action === 'search') {
-            if (!user) {
+            // Only increment strict usage limit for non-fast searches
+            if (!user && mode !== 'fast') {
                 guestMode.incrementUsage();
-            }
-            if (mode === 'deep_dive' && !isPro) {
-                const newCount = deepDiveUsageCount + 1;
-                setDeepDiveUsageCount(newCount);
-                localStorage.setItem('deep_dive_usage', newCount.toString());
             }
         }
     };
@@ -90,16 +76,22 @@ export function UsageGateProvider({ children }: { children: ReactNode }) {
         window.location.reload();
     };
 
+    const setShowPremiumModalWithReset = (show: boolean) => {
+        if (!show) setPaywallContext(null);
+        setShowPremiumModal(show);
+    };
+
     return (
         <UsageGateContext.Provider value={{
             checkAction,
             recordAction,
             showPremiumModal,
-            setShowPremiumModal,
+            setShowPremiumModal: setShowPremiumModalWithReset,
+            paywallContext,
             upgradeToPro,
             isPro,
-            deepDiveUsageCount,
-            deepDiveLimit: DEEP_DIVE_LIMIT
+            deepDiveUsageCount: 0,
+            deepDiveLimit: 0
         }}>
             {children}
         </UsageGateContext.Provider>

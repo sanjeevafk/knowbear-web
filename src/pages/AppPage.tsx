@@ -1,15 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { queryTopic } from '../api'
+import { queryTopicStream } from '../api'
 import type { QueryResponse, Level, Mode } from '../types'
 import SearchBar from '../components/SearchBar'
 import LevelDropdown from '../components/LevelDropdown'
 import ExplanationCard from '../components/ExplanationCard'
 import ExportDropdown from '../components/ExportDropdown'
-import Spinner from '../components/Spinner'
 import { useUsageGate } from '../hooks/useUsageGate'
 import { UpgradeModal } from '../components/UpgradeModal'
 import { RefreshCcw } from 'lucide-react'
 import Sidebar from '../components/Sidebar'
+import MobileBottomNav from '../components/MobileBottomNav'
+import { SkeletonLoader, CardSkeleton } from '../components/SkeletonLoader'
 
 export default function AppPage() {
     // const [pinned, setPinned] = useState<PinnedTopic[]>([])
@@ -19,7 +20,10 @@ export default function AppPage() {
     const [error, setError] = useState<string | null>(null)
     const [mode, setMode] = useState<Mode>('fast')
     const [fetchingLevels, setFetchingLevels] = useState<Set<Level>>(new Set())
+    const [failedLevels, setFailedLevels] = useState<Set<Level>>(new Set())
     const [historyRefresh, setHistoryRefresh] = useState(0)
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+    const [activeTopic, setActiveTopic] = useState('')
 
     const { checkAction, recordAction, showPremiumModal, setShowPremiumModal } = useUsageGate()
 
@@ -30,28 +34,56 @@ export default function AppPage() {
     const fetchLevel = useCallback(async (topic: string, level: Level) => {
         if (!topic) return
         setFetchingLevels(prev => new Set(prev).add(level))
-        try {
-            const res = await queryTopic({
-                topic,
-                levels: [level],
-                mode
-            })
 
-            // Only update if it's still the current topic
-            if (currentTopicRef.current === topic) {
-                setResult(prev => {
-                    if (!prev || prev.topic !== topic) {
-                        return { ...res, explanations: { ...res.explanations } }
+        let accumulatedContent = ''
+
+        try {
+            await queryTopicStream(
+                {
+                    topic,
+                    levels: [level],
+                    mode,
+                    premium: localStorage.getItem('knowbear_pro_status') === 'true'
+                },
+                (chunk) => {
+                    accumulatedContent += chunk
+                    if (currentTopicRef.current === topic) {
+                        setResult(prev => {
+                            if (!prev || prev.topic !== topic) {
+                                return {
+                                    topic,
+                                    explanations: { [level]: accumulatedContent },
+                                    cached: false
+                                }
+                            }
+                            return {
+                                ...prev,
+                                explanations: { ...prev.explanations, [level]: accumulatedContent }
+                            }
+                        })
                     }
-                    return {
-                        ...prev,
-                        explanations: { ...prev.explanations, ...res.explanations }
-                    }
-                })
-            }
+                },
+                () => {
+                    setFetchingLevels(prev => {
+                        const next = new Set(prev)
+                        next.delete(level)
+                        return next
+                    })
+                    setHistoryRefresh(prev => prev + 1)
+                },
+                (err) => {
+                    console.error(`Failed to stream ${level}:`, err)
+                    setFailedLevels(prev => new Set(prev).add(level))
+                    setFetchingLevels(prev => {
+                        const next = new Set(prev)
+                        next.delete(level)
+                        return next
+                    })
+                }
+            )
         } catch (err) {
-            console.error(`Failed to fetch ${level}:`, err)
-        } finally {
+            console.error(`Failed to start stream for ${level}:`, err)
+            setFailedLevels(prev => new Set(prev).add(level))
             setFetchingLevels(prev => {
                 const next = new Set(prev)
                 next.delete(level)
@@ -60,7 +92,7 @@ export default function AppPage() {
         }
     }, [mode])
 
-    const handleSearch = useCallback(async (topic: string, forceRefresh: boolean = false) => {
+    const handleSearch = useCallback(async (topic: string, _forceRefresh: boolean = false) => {
         // Usage gate check (handles Guest limits and Soft Gates like Deep Dive)
         const { allowed: searchAllowed, downgraded } = checkAction('search', mode)
 
@@ -77,67 +109,65 @@ export default function AppPage() {
         // Determine actual mode to use (Downgrade if needed)
         const effectiveMode = downgraded ? 'fast' : mode
 
-        recordAction('search', mode)
+        recordAction('search', effectiveMode)
 
+        setActiveTopic(topic)
         setLoading(true)
         setError(null)
         setResult(null)
         setFetchingLevels(new Set())
+        setFailedLevels(new Set())
         currentTopicRef.current = topic
 
-        try {
-            // Initial fetch for the selected level only for speed
-            const res = await queryTopic({
-                topic,
-                levels: [selectedLevel],
-                mode: effectiveMode,
-                bypass_cache: forceRefresh
-            })
-
-            if (currentTopicRef.current === topic) {
-                setResult(res)
-
-                // OPTIMIZATION: Removed aggressive pre-fetching of all levels to save tokens/costs.
-                // Levels will be lazy-loaded only when the user selects them via fetchLevel useEffect.
-                setHistoryRefresh(prev => prev + 1)
-            }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to generate')
-        } finally {
-            setLoading(false)
-        }
+        // Use fetchLevel which now handles streaming
+        await fetchLevel(topic, selectedLevel)
+        setLoading(false)
     }, [mode, selectedLevel, fetchLevel, checkAction, recordAction])
 
     const handleGoHome = useCallback(() => {
         setResult(null)
         setError(null)
         setLoading(false)
+        setActiveTopic('')
         currentTopicRef.current = null
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }, [])
 
     // Fetch level when user switches and it's missing
     useEffect(() => {
-        if (result && !result.explanations[selectedLevel] && !fetchingLevels.has(selectedLevel)) {
+        if (result &&
+            !result.explanations[selectedLevel] &&
+            !fetchingLevels.has(selectedLevel) &&
+            !failedLevels.has(selectedLevel)
+        ) {
             fetchLevel(result.topic, selectedLevel)
         }
-    }, [selectedLevel, result, fetchingLevels, fetchLevel])
+    }, [selectedLevel, result, fetchingLevels, failedLevels, fetchLevel])
+
+    // Track if mobile for sidebar default state
+    useEffect(() => {
+        if (window.innerWidth <= 768) {
+            setIsSidebarOpen(false)
+        }
+    }, [setIsSidebarOpen])
 
     return (
-        <div className="flex min-h-screen bg-black overflow-hidden">
+        <div className="flex min-h-screen bg-black overflow-hidden relative">
             <Sidebar
                 onSelectTopic={(topic) => handleSearch(topic)}
                 refreshTrigger={historyRefresh}
+                isOpen={isSidebarOpen}
+                onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 min-w-0 flex flex-col relative transition-all duration-300 pl-16 md:pl-64">
+            <div className={`flex-1 min-w-0 flex flex-col relative transition-all duration-300 md:pl-0 ${isSidebarOpen ? 'md:pl-64' : 'md:pl-16'}`}>
                 {/* Starry Background */}
                 <div className="stars"></div>
                 <div className="stars stars-2"></div>
 
                 {/* Content Container */}
-                <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col min-h-[90vh] py-8 px-4 md:px-8">
+                <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col min-h-[90vh] py-8 px-4 md:px-8 pb-32 md:pb-8">
 
                     <header className="text-center mb-12 mt-10 flex flex-col items-center">
                         <button
@@ -159,7 +189,18 @@ export default function AppPage() {
                             loading={loading}
                             mode={mode}
                             onModeChange={setMode}
+                            value={activeTopic}
                         />
+
+                        {!result && loading && (
+                            <div className="space-y-8 animate-pulse">
+                                <div className="h-10 bg-dark-700/50 rounded-full w-48 mx-auto mb-8"></div>
+                                <CardSkeleton />
+                                <div className="space-y-4">
+                                    <SkeletonLoader />
+                                </div>
+                            </div>
+                        )}
 
                         {!result && !loading && (
                             <section className="bg-dark-800/50 backdrop-blur-sm border border-dark-700 rounded-2xl p-6 shadow-2xl">
@@ -192,12 +233,7 @@ export default function AppPage() {
                             </section>
                         )}
 
-                        {loading && (
-                            <div className="py-12 flex flex-col items-center">
-                                <Spinner size="lg" />
-                                <p className="text-center text-gray-400 mt-4 animate-pulse">Generating explanation for {selectedLevel}...</p>
-                            </div>
-                        )}
+
 
                         {error && (
                             <div className="bg-red-900/30 border border-red-500 text-red-300 p-4 rounded-lg">
@@ -218,20 +254,21 @@ export default function AppPage() {
                                         <button
                                             onClick={() => handleSearch(result.topic, true)}
                                             disabled={loading}
-                                            className="flex items-center gap-2 px-4 py-3 bg-dark-700 hover:bg-dark-600 border border-dark-600 rounded-lg text-white transition-all disabled:opacity-50 w-full md:w-auto justify-center"
+                                            className="hidden md:flex items-center gap-2 px-4 py-3 bg-dark-700 hover:bg-dark-600 border border-dark-600 rounded-lg text-white transition-all disabled:opacity-50 w-full md:w-auto justify-center"
                                             title="Regenerate"
                                         >
                                             <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                                             <span className="md:hidden lg:inline text-sm font-medium">Regenerate</span>
                                         </button>
                                     </div>
-                                    <ExportDropdown topic={result.topic} explanations={result.explanations} />
+                                    <div className="hidden md:block">
+                                        <ExportDropdown topic={result.topic} explanations={result.explanations} />
+                                    </div>
                                 </div>
 
                                 {fetchingLevels.has(selectedLevel) ? (
-                                    <div className="bg-dark-800/50 backdrop-blur-sm rounded-xl p-16 flex flex-col items-center border border-dark-700 shadow-xl">
-                                        <Spinner size="md" />
-                                        <p className="text-gray-400 mt-4 font-medium italic">Brewing {selectedLevel.toUpperCase()} explanation...</p>
+                                    <div className="bg-dark-800/50 backdrop-blur-sm rounded-xl p-8 border border-dark-700 shadow-xl">
+                                        <SkeletonLoader />
                                     </div>
                                 ) : result.explanations[selectedLevel] ? (
                                     <ExplanationCard level={selectedLevel} content={result.explanations[selectedLevel]} />
@@ -250,6 +287,16 @@ export default function AppPage() {
                     </footer>
                 </div>
             </div>
+
+            <MobileBottomNav
+                onRegenerate={() => result && handleSearch(result.topic, true)}
+                topic={result?.topic || ''}
+                explanations={result?.explanations || {}}
+                loading={loading}
+                hasResult={!!result}
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            />
 
             <UpgradeModal isOpen={showPremiumModal} onClose={() => setShowPremiumModal(false)} />
         </div>

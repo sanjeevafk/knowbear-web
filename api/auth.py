@@ -1,4 +1,6 @@
+import asyncio
 from fastapi import HTTPException, Security, Depends
+
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from config import get_settings
 from supabase import create_client, Client
@@ -35,9 +37,10 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Security(secu
 
     try:
         # Verify token by getting the user
-        user_response = supabase.auth.get_user(token)
+        user_response = await asyncio.to_thread(supabase.auth.get_user, token)
         if not user_response or not user_response.user:
             raise HTTPException(status_code=401, detail="Invalid token")
+
             
         return {"user": user_response.user, "token": token}
         
@@ -57,7 +60,7 @@ async def verify_token_optional(credentials: HTTPAuthorizationCredentials = Secu
     except HTTPException:
         return None
 
-def ensure_user_exists(user):
+async def ensure_user_exists(user):
     """Ensure the user exists in the public.users table."""
     supabase = get_supabase_admin()
     if not supabase:
@@ -65,11 +68,15 @@ def ensure_user_exists(user):
     
     try:
         # Upsert user data
-        supabase.table("users").upsert({
-            "id": user.id,
-            "email": user.email,
-            "full_name": user.user_metadata.get("full_name"),
-            "avatar_url": user.user_metadata.get("avatar_url")
-        }).execute()
+        def _upsert():
+            return supabase.table("users").upsert({
+                "id": user.id,
+                "email": user.email,
+                "full_name": user.user_metadata.get("full_name"),
+                "avatar_url": user.user_metadata.get("avatar_url")
+            }).execute()
+        
+        await asyncio.to_thread(_upsert)
     except Exception as e:
         print(f"Failed to ensure user exists: {e}")
+

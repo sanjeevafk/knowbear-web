@@ -20,7 +20,13 @@ async def get_redis() -> redis.Redis:
             url = f"redis://{url}"
         
         # Decode responses=False for orjson (bytes)
-        _client = redis.from_url(url, decode_responses=False)
+        _client = redis.from_url(
+            url, 
+            decode_responses=False,
+            socket_timeout=2.0,
+            socket_connect_timeout=2.0
+        )
+
     return _client
 
 

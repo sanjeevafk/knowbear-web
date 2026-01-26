@@ -2,18 +2,21 @@
 
 import asyncio
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from fastapi_limiter.depends import RateLimiter
 from utils import sanitize_topic, topic_cache_key
 from services.cache import cache_get, cache_set
 from services.ensemble import ensemble_generate
+from services.inference import generate_stream_explanation
 from auth import verify_token_optional, get_supabase_admin, ensure_user_exists
 from logging_config import logger
+import json
 
 router = APIRouter(tags=["query"])
 
 FREE_LEVELS = ["eli5", "eli10", "eli12", "eli15", "meme"]
-PREMIUM_LEVELS = ["technical", "systemic", "diagram", "classic60", "gentle70", "warm80"]
+PREMIUM_LEVELS = ["classic60", "gentle70", "warm80"]
 
 
 class QueryRequest(BaseModel):
@@ -87,7 +90,10 @@ async def query_topic(
             key = topic_cache_key(topic, lvl)
             await cache_set(key, {"text": result})
         else:
-            explanations[lvl] = f"Error generating {lvl}"
+            error_msg = str(result) if result else "Unknown error"
+            explanations[lvl] = f"Error generating {lvl}: {error_msg}"
+            logger.error("query_generation_failed", level=lvl, error=error_msg)
+
 
     if auth_data:
         logger.info("query_success_saving_history", user_id=auth_data["user"].id, topic=topic)
@@ -98,18 +104,70 @@ async def query_topic(
     return QueryResponse(topic=topic, explanations=explanations, cached=False)
 
 
+@router.post("/query/stream")
+async def query_topic_stream(
+    req: QueryRequest,
+    auth_data: dict = Depends(verify_token_optional)
+):
+    """Stream explanations for a topic."""
+    
+    # Gating: Enforce Premium for 'ensemble'/'technical_depth'
+    if (req.mode == "ensemble" or req.mode == "technical_depth") and not req.premium:
+        req.mode = "fast"
+
+    try:
+        topic = sanitize_topic(req.topic)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    # For streaming, we usually handle one level at a time in the simple implementation
+    # But let's assume the frontend sends the specific level it wants streamed if not all
+    level = req.levels[0] if req.levels else "eli5"
+
+    async def event_generator():
+        full_content = ""
+        try:
+            # Yield metadata first
+            yield f"data: {json.dumps({'topic': topic, 'level': level})}\n\n"
+            
+            async for chunk in generate_stream_explanation(
+                topic, 
+                level, 
+                mode=req.mode, 
+                premium=req.premium,
+                is_pro=req.premium
+            ):
+                full_content += chunk
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            
+            # Final event with full data for caching or history saving
+            yield "data: [DONE]\n\n"
+            
+            # Record in history if authenticated
+            if auth_data:
+                asyncio.create_task(save_to_history(auth_data["user"], topic, [level]))
+                
+        except Exception as e:
+            logger.error("streaming_failed", error=str(e), topic=topic)
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 async def save_to_history(user, topic: str, levels: list[str]):
     """Background task to save query to history. Deduplicates by topic per user."""
     logger.info("save_to_history_task_start", user_id=user.id, topic=topic)
     try:
-        ensure_user_exists(user)
+        await ensure_user_exists(user)
         supabase = get_supabase_admin()
         if not supabase:
             logger.error("save_to_history_task_no_supabase_admin")
             return
 
         # Check for existing entry for this user and topic
-        existing = supabase.table("history").select("id, levels").eq("user_id", user.id).eq("topic", topic).execute()
+        existing = await asyncio.to_thread(
+            supabase.table("history").select("id, levels").eq("user_id", user.id).eq("topic", topic).execute
+        )
         
         if existing.data:
             # Update existing entry
@@ -117,19 +175,24 @@ async def save_to_history(user, topic: str, levels: list[str]):
             existing_levels = set(existing.data[0]["levels"])
             new_levels = list(existing_levels.union(set(levels)))
             
-            supabase.table("history").update({
-                "levels": new_levels,
-                "created_at": "now()" # Move to top
-            }).eq("id", item_id).execute()
+            await asyncio.to_thread(
+                supabase.table("history").update({
+                    "levels": new_levels,
+                    "created_at": "now()" # Move to top
+                }).eq("id", item_id).execute
+            )
             logger.info("save_to_history_task_updated", user_id=user.id, topic=topic)
         else:
             # Insert new entry
-            response = supabase.table("history").insert({
-                "user_id": user.id,
-                "topic": topic,
-                "levels": levels
-            }).execute()
+            response = await asyncio.to_thread(
+                supabase.table("history").insert({
+                    "user_id": user.id,
+                    "topic": topic,
+                    "levels": levels
+                }).execute
+            )
             logger.info("save_to_history_task_success", user_id=user.id, topic=topic, data=bool(response.data))
+
             
     except Exception as e:
         logger.error("save_to_history_task_error", error=str(e), user_id=user.id, topic=topic)

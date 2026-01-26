@@ -2,9 +2,18 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { LoginButton } from '../components/LoginButton'
+import { useAuth } from '../context/AuthContext'
+import { useEffect } from 'react'
 
 export default function LandingPage() {
     const navigate = useNavigate()
+    const { user } = useAuth()
+
+    useEffect(() => {
+        if (user) {
+            navigate('/app')
+        }
+    }, [user, navigate])
 
     return (
         <div className="min-h-screen bg-black text-white px-4 relative overflow-hidden flex flex-col items-center justify-center">

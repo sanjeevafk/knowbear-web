@@ -1,7 +1,9 @@
 """Export endpoint for downloading explanations."""
 
+import asyncio
 import io
 import json
+
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -74,13 +76,14 @@ async def export_explanations(req: ExportRequest) -> StreamingResponse:
                 pdf.multi_cell(0, 6, safe_text)
                 pdf.ln(10)
 
-            pdf_bytes = pdf.output()
+            pdf_bytes = await asyncio.to_thread(pdf.output)
             if isinstance(pdf_bytes, (bytes, bytearray)):
                 buf = io.BytesIO(pdf_bytes)
             else:
                 buf = io.BytesIO()
-                pdf.output(buf)
+                await asyncio.to_thread(pdf.output, buf)
                 buf.seek(0)
+
 
             return StreamingResponse(
                 buf,

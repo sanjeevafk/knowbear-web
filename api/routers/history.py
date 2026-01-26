@@ -1,4 +1,6 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException
+
 from auth import verify_token, get_supabase_admin
 from pydantic import BaseModel
 from typing import List
@@ -29,8 +31,11 @@ async def get_history(auth_data: dict = Depends(verify_token)):
         raise HTTPException(status_code=500, detail="Database connection error")
     
     try:
-        response = supabase.table("history").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute()
+        response = await asyncio.to_thread(
+            supabase.table("history").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute
+        )
         return response.data
+
     except Exception as e:
         logger.error("get_history_error", error=str(e), user_id=user_id)
         raise HTTPException(status_code=500, detail="Failed to fetch history")
@@ -45,11 +50,14 @@ async def add_history_item(data: HistoryCreate, auth_data: dict = Depends(verify
         raise HTTPException(status_code=500, detail="Database connection error")
         
     try:
-        response = supabase.table("history").insert({
-            "user_id": user_id,
-            "topic": data.topic,
-            "levels": data.levels
-        }).execute()
+        response = await asyncio.to_thread(
+            supabase.table("history").insert({
+                "user_id": user_id,
+                "topic": data.topic,
+                "levels": data.levels
+            }).execute
+        )
+
         
         if not response.data:
             raise HTTPException(status_code=500, detail="Failed to save history")
@@ -70,8 +78,11 @@ async def delete_history_item(item_id: str, auth_data: dict = Depends(verify_tok
         
     try:
         # Securely delete only if user_id matches
-        supabase.table("history").delete().eq("id", item_id).eq("user_id", user_id).execute()
+        await asyncio.to_thread(
+            supabase.table("history").delete().eq("id", item_id).eq("user_id", user_id).execute
+        )
         return {"status": "deleted"}
+
     except Exception as e:
         logger.error("delete_history_error", error=str(e), user_id=user_id, item_id=item_id)
         raise HTTPException(status_code=500, detail="Failed to delete history item")

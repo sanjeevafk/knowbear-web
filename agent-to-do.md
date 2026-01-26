@@ -9,10 +9,10 @@ This document outlines the development path for KnowBear, organized by logical i
 
 1.  **Backend Import Cleanup**
     *   Refactor `api/index.py` and directory structure to use standard Python import mechanisms instead of runtime `sys.path` manipulation.
-2.  **Ensemble Logic & Deep Dive Refactor**
+2.  **Ensemble Logic & Deep Dive Refactor** [DONE]
     *   **REMOVE**: Scrap the "Deep Dive" mode completely.
     *   **KEEP/IMPROVE**: Heavily test and tune Ensemble answers to ensure they significantly outperform Fast mode in accuracy and synthesis.
-3.  **Technical Depth Mode Overhaul**
+3.  **Technical Depth Mode Overhaul** [DONE]
     *   **REFACTOR**: Remove the old Technical/Systemic modes from simple dropdowns.
     *   **ENHANCE**: Integrate real-time web quoting, `mermaid.js` diagrams, and explanatory images. Answer quality must meet academic/research standards.
 
@@ -31,22 +31,23 @@ This document outlines the development path for KnowBear, organized by logical i
 
 ---
 
-## Phase 3: UI/UX & Mobile-First Navigation
+## Phase 3: UI/UX & Mobile-First Navigation [COMPLETED]
 *Focus: Making the app look and feel premium on every device.*
 
-7.  **Integrated Mode Selection**
+7.  **Integrated Mode Selection** [DONE]
     *   Move Fast, Ensemble, and Technical modes into a unified, high-polish dropdown menu.
-8.  **Mobile-First UI/UX Optimization**
+8.  **Mobile-First UI/UX Optimization** [DONE]
     *   Ensure the **Landing Page** and the core App interface are fully optimized for all mobile screen sizes.
     *   Ensure all touch targets and layouts are optimized for mobile.
     *   Implement dynamic button resizing based on viewport.
-9.  **Mobile Bottom Navigation**
+9.  **Mobile Bottom Navigation** [DONE]
     *   Implement a sticky bottom navbar for mobile screens.
     *   **FEATURES**: Include "Regenerate," "Export," and the "Mode Dropdown" in this sticky bar.
 
+
 ---
 
-## Phase 4: Experience Polish & Gating Logic
+## Phase 4: Experience Polish & Gating Logic [IN PROGRESS]
 *Focus: Fine-tuning output quality and implementing the business model.*
 
 10. **Fix Meme Style Answers**
@@ -54,11 +55,18 @@ This document outlines the development path for KnowBear, organized by logical i
 11. **AI Response Streaming & UX Polish**
     *   Implement SSE/WebSockets for a "typewriter" effect.
     *   Replace spinners with high-quality **Skeleton Loaders**.
-12. **Guest User Experience & Onboarding**
+12. **Guest User Experience & Onboarding** [DONE]
     *   Default guests to "Fast" mode; hide premium modes.
     *   Trigger an onboarding modal on entry or after the first query to explain the benefits of signing up/upgrading.
-13. **Dynamic Rejection Handling**
+13. **Dynamic Rejection Handling** [DONE]
     *   Replace generic upgrade messages with context-aware ones (e.g., "Upgrade to Pro to export as PDF").
+
+---
+
+## Latency & Stability Hotfix [COMPLETED]
+*   Fixed infinite retry loop in `AppPage.tsx`.
+*   Unified 90s frontend timeouts with backend retry/fallback safety.
+*   Implemented full state purge on logout (localStorage & reload).
 
 ---
 

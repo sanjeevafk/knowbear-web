@@ -18,9 +18,6 @@ const LEVEL_LABELS: Record<Level, string> = {
     classic60: 'Classic (80s/90s)',
     gentle70: 'Gentle & Kind',
     warm80: 'Warm & Fuzzy',
-    technical: 'Technical',
-    systemic: 'Systemic View',
-    diagram: 'System Diagram',
 }
 
 export default function LevelDropdown({ selected, onChange }: LevelDropdownProps) {
