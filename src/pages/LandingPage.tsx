@@ -57,7 +57,7 @@ export default function LandingPage() {
                             initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ duration: 1, type: "spring" }}
-                            className="inline-flex items-center gap-2 p-3 px-6 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-[0.2em] mb-8 whitespace-nowrap"
+                            className="inline-flex flex-wrap justify-center sm:flex-nowrap items-center gap-x-2 gap-y-1 p-2 px-3 sm:p-3 sm:px-6 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[0.65rem] sm:text-xs font-bold uppercase tracking-widest sm:tracking-[0.2em] mb-8 max-w-[95vw] text-center"
                         >
                             The Next-Gen Knowledge Engine
                             <span className="py-0.5 px-2 bg-cyan-500/20 rounded-md text-[10px] lowercase tracking-normal font-medium border border-cyan-500/30 whitespace-nowrap">v2-beta</span>
