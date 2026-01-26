@@ -60,6 +60,9 @@ This document outlines the development path for KnowBear, organized by logical i
     *   Trigger an onboarding modal on entry or after the first query to explain the benefits of signing up/upgrading.
 13. **Dynamic Rejection Handling** [DONE]
     *   Replace generic upgrade messages with context-aware ones (e.g., "Upgrade to Pro to export as PDF").
+13b. **Server-Side Security Hardening** [DONE]
+    *   Implemented server-side verification for all premium feature requests.
+    *   Added admin utility scripts for manual user promotion.
 
 ---
 
