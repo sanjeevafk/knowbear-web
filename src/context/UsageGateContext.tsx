@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from './AuthContext';
 import { useGuestMode } from '../hooks/useGuestMode';
 
 export type ActionType = 'search' | 'export_data' | 'premium_mode';
