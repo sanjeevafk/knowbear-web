@@ -36,7 +36,7 @@ export default function AppPage() {
     const currentTopicRef = useRef<string | null>(null)
 
 
-    const fetchLevel = useCallback(async (topic: string, level: Level, overrideMode?: Mode) => {
+    const fetchLevel = useCallback(async (topic: string, level: Level, overrideMode?: Mode, options?: { temperature?: number, regenerate?: boolean }) => {
         if (!topic) return
         setFetchingLevels(prev => new Set(prev).add(level))
         const activeMode = overrideMode || mode
@@ -49,7 +49,10 @@ export default function AppPage() {
                     topic,
                     levels: [level],
                     mode: activeMode,
-                    premium: localStorage.getItem('knowbear_pro_status') === 'true'
+                    premium: localStorage.getItem('knowbear_pro_status') === 'true',
+                    bypass_cache: options?.regenerate,
+                    temperature: options?.temperature,
+                    regenerate: options?.regenerate
                 },
                 (chunk) => {
                     accumulatedContent += chunk
@@ -169,7 +172,31 @@ export default function AppPage() {
         setLoading(true)
         setIsFromCache(false)
         setError(null)
-        setResult(null)
+
+        // If regenerating, we keep the previous result but will overwrite the active level
+        if (!_forceRefresh) {
+            setResult(null)
+        } else {
+            // Regeneration specific: Clear current level to trigger LoadingState
+            setResult(prev => prev ? {
+                ...prev,
+                explanations: { ...prev.explanations, [activeLevel]: '' }
+            } : null)
+
+            // Regeneration specific: Increase temperature to 0.95–1.1
+            const randomTemp = Math.random() * (1.1 - 0.95) + 0.95
+            setFetchingLevels(new Set())
+            setFailedLevels(new Set())
+            currentTopicRef.current = topic
+            await fetchLevel(topic, activeLevel, effectiveMode, {
+                temperature: randomTemp,
+                regenerate: true
+            })
+            setLoading(false)
+            setLoadingMeta(null)
+            return
+        }
+
         setFetchingLevels(new Set())
         setFailedLevels(new Set())
         currentTopicRef.current = topic

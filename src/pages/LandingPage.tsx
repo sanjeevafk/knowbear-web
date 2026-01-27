@@ -79,9 +79,9 @@ export default function LandingPage() {
                             transition={{ delay: 0.5 }}
                             className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto mb-12 leading-relaxed"
                         >
-                            KnowBear orchestrates a massive fleet of AI models <br className="hidden md:block" />
-                            to synthesize web knowledge into tailored explanations. <br className="hidden md:block" />
-                            From 5-year-olds to PhD researchers.
+                            From razor-sharp technical breakdowns to clever, instantly relatable insights, <br className="hidden md:block" />
+                            KnowBear turns the world’s knowledge into exactly the explanation you’re craving right now. <br className="hidden md:block" />
+                            Every answer is crystal-clear, perfectly paced, and comes with that little extra spark of perspective that makes it stick.
                         </motion.p>
 
                         <motion.div
@@ -97,6 +97,9 @@ export default function LandingPage() {
                                 Start Researching
                                 <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                             </button>
+                            <p className="mt-8 text-cyan-500/50 text-sm font-medium tracking-wide italic max-w-sm mx-auto">
+                                "Finally, a research engine that handles academic rigor or a sharp, clever breakdown with equal brilliance. Knowledge with a human spark."
+                            </p>
                         </motion.div>
                     </div>
                 </section>
@@ -112,8 +115,8 @@ export default function LandingPage() {
                             />
                             <FeatureCard
                                 icon={<Layers className="w-8 h-8 text-purple-400" />}
-                                title="Multi-Level Logic"
-                                description="Tailor explanations to your specific level. Whether you need a simple analogy or a deep technical dive, KnowBear adapts instantly."
+                                title="Dynamic Logic"
+                                description="Shift seamlessly between meticulous academic rigor and witty, relatable analogies. We don’t just fetch facts; we translate them into insights that actually resonate."
                             />
                             <FeatureCard
                                 icon={<Cpu className="w-8 h-8 text-blue-400" />}
@@ -129,12 +132,12 @@ export default function LandingPage() {
                     <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
                         <div>
                             <h2 className="text-4xl md:text-6xl font-black tracking-tight mb-8">
-                                Built for <span className="text-cyan-500">Unrivaled</span> Explanation Quality.
+                                Built for <span className="text-cyan-500">Unrivaled</span> Clarity and Clever Insight.
                             </h2>
                             <div className="space-y-6">
                                 <CheckItem title="Technical Depth Mode" description="Graduate-level research reports with full academic structure and automated technical diagrams." />
-                                <CheckItem title="ELI5 Logic" description="Sensory-based analogies that help children (or busy pros) grasp complex concepts in seconds." />
-                                <CheckItem title="Zero Latency Streaming" description="Hyper-fast response engine that delivers comprehensive answers with virtually no wait time." />
+                                <CheckItem title="Relatable Reasoning" description="Clever analogies and a touch of wit that turn daunting concepts into lighthearted, sensory revelations." />
+                                <CheckItem title="Wisdom-Infused Streaming" description="Hyper-fast responses delivered with a final drop of timeless perspective to keep your mind buzzing." />
                             </div>
                         </div>
                         <div className="relative group">

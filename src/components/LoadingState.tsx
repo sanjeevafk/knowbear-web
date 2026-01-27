@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import type { Mode, Level } from '../types'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Quote } from 'lucide-react'
 
 interface LoadingStateProps {
     mode: Mode
@@ -8,8 +8,17 @@ interface LoadingStateProps {
     topic: string
 }
 
+const FALLBACK_QUOTES = [
+    "The mind is not a vessel to be filled, but a fire to be kindled. — Plutarch",
+    "An investment in knowledge pays the best interest. — Benjamin Franklin",
+    "Wisdom is not a product of schooling but of the lifelong attempt to acquire it. — Albert Einstein",
+    "The important thing is not to stop questioning. Curiosity has its own reason for existence. — Albert Einstein",
+    "Live as if you were to die tomorrow. Learn as if you were to live forever. — Mahatma Gandhi"
+]
+
 export const LoadingState: React.FC<LoadingStateProps> = ({ mode, level, topic }) => {
     const [message, setMessage] = useState('')
+    const [quote, setQuote] = useState<string | null>(null)
 
     useEffect(() => {
         let baseMessage = 'Generating your explanation...'
@@ -33,23 +42,59 @@ export const LoadingState: React.FC<LoadingStateProps> = ({ mode, level, topic }
         }
 
         setMessage(baseMessage)
+
+        // Fetch random quote
+        const fetchQuote = async () => {
+            try {
+                const response = await fetch('https://api.quotable.io/random?tags=education|knowledge|learning|science|wisdom|research|effort|creativity&maxLength=100')
+                if (!response.ok) throw new Error('Quote API failed')
+                const data = await response.json()
+                if (data.content && data.author) {
+                    setQuote(`«${data.content}» — ${data.author}`)
+                } else {
+                    throw new Error('Invalid quote data')
+                }
+            } catch (err) {
+                console.error('Failed to fetch quote:', err)
+                const randomFallback = FALLBACK_QUOTES[Math.floor(Math.random() * FALLBACK_QUOTES.length)]
+                setQuote(randomFallback)
+            }
+        }
+
+        fetchQuote()
     }, [mode, level, topic])
 
     return (
-        <div className="flex flex-col items-center justify-center p-12 min-h-[300px] animate-in fade-in duration-700">
-            <div className="relative mb-6">
-                <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full scale-150 animate-pulse"></div>
-                <Loader2 className="w-12 h-12 text-cyan-500 animate-spin relative z-10" />
+        <div className="flex flex-col items-center justify-center p-12 min-h-[400px] animate-in fade-in duration-700">
+            <div className="relative mb-8">
+                <div className="absolute inset-0 bg-cyan-500/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
+                <Loader2 className="w-16 h-16 text-cyan-500 animate-spin relative z-10" />
             </div>
 
-            <div className="text-center space-y-2">
-                <p className="text-xl font-medium text-white tracking-tight animate-pulse">
-                    {message}
-                    <span className="inline-flex w-8 text-left ml-0.5">
-                        <span className="animate-[ellipsis_1.5s_infinite]">...</span>
-                    </span>
-                </p>
-                <p className="text-sm text-gray-400 max-w-sm mx-auto leading-relaxed italic">
+            <div className="text-center space-y-6 max-w-lg">
+                <div className="space-y-2">
+                    <p className="text-2xl font-black text-white tracking-tight animate-pulse">
+                        {message}
+                        <span className="inline-flex w-8 text-left ml-0.5">
+                            <span className="animate-[ellipsis_1.5s_infinite]">...</span>
+                        </span>
+                    </p>
+                    <p className="text-sm text-cyan-400/70 font-medium uppercase tracking-[0.2em]">
+                        Meanwhile
+                    </p>
+                </div>
+
+                {quote && (
+                    <div className="relative p-6 bg-white/[0.03] border border-white/10 rounded-2xl animate-in zoom-in-95 duration-500 delay-200">
+                        <Quote className="absolute -top-3 -left-3 w-8 h-8 text-white/5 rotate-180" />
+                        <p className="text-gray-300 italic leading-relaxed text-sm md:text-base font-medium">
+                            {quote}
+                        </p>
+                        <Quote className="absolute -bottom-3 -right-3 w-8 h-8 text-white/5" />
+                    </div>
+                )}
+
+                <p className="text-xs text-gray-500 max-w-sm mx-auto leading-relaxed border-t border-white/5 pt-4">
                     {mode === 'technical_depth' ? 'Consulting academic sources and real-time research context.' : 'Synthesizing knowledge for the perfect explanation.'}
                 </p>
             </div>

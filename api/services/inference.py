@@ -113,6 +113,11 @@ async def generate_stream_explanation(topic: str, level: str, **kwargs):
     async for chunk in provider.route_inference_stream(prompt, **kwargs):
         yield chunk
 
+    # Append random quote if this is a regeneration
+    if kwargs.get("regenerate"):
+        quote = await search_service.get_regeneration_quote()
+        yield f"\n\n{quote}"
+
     # Append images at the end of the stream for technical depth
     if mode == "technical_depth" and images:
         yield "\n\n### Visual References\n"

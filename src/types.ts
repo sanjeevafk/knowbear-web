@@ -10,6 +10,8 @@ export interface QueryRequest {
     premium?: boolean
     bypass_cache?: boolean
     mode?: 'fast' | 'ensemble' | 'technical_depth'
+    temperature?: number
+    regenerate?: boolean
 }
 
 export type Mode = 'fast' | 'ensemble' | 'technical_depth'

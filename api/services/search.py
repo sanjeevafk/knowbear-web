@@ -168,16 +168,97 @@ class SearchManager:
             logger.error("image_search_failed", error=str(e))
             return []
 
-    async def get_quote(self) -> Optional[str]:
-        # api.quotable.io
+    async def get_quote(self) -> str:
+        # Simple quote for loading messages
+        tags = "education|knowledge|learning|science|wisdom|research|effort|creativity"
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get("https://api.quotable.io/random?tags=technology|science|wisdom")
+                resp = await client.get(f"https://api.quotable.io/random?tags={tags}&maxLength=100")
                 if resp.status_code == 200:
                     data = resp.json()
-                    return f"> {data['content']} — {data['author']}"
+                    return f"«{data['content']}» — {data['author']}"
         except:
             pass
-        return None
+        
+        fallbacks = [
+            "The mind is not a vessel to be filled, but a fire to be kindled. — Plutarch",
+            "An investment in knowledge pays the best interest. — Benjamin Franklin",
+            "Wisdom is not a product of schooling but of the lifelong attempt to acquire it. — Albert Einstein",
+            "The important thing is not to stop questioning. Curiosity has its own reason for existence. — Albert Einstein",
+            "Live as if you were to die tomorrow. Learn as if you were to live forever. — Mahatma Gandhi"
+        ]
+        return random.choice(fallbacks)
+
+    async def get_regeneration_quote(self) -> str:
+        """Specialized quote fetching for regenerated answers with style variety."""
+        tags = "education|knowledge|learning|science|wisdom|philosophy|technology|research|creativity|innovation|discovery|effort|critical-thinking"
+        styles = [
+            "---\n*“{content}”* — {author}",
+            "---\nAs {author} said: *“{content}”*",
+            "---\n*“{content}”*\n— {author}",
+            "---\nIn the words of {author}: *“{content}”*",
+            "---\nA thought worth keeping: *“{content}”* — {author}"
+        ]
+        
+        fallback_quotes = [
+            {"author": "Marie Curie", "content": "Nothing in life is to be feared, it is only to be understood. Now is the time to understand more."},
+            {"author": "Richard Feynman", "content": "The first principle is that you must not fool yourself and you are the easiest person to fool."},
+            {"author": "Leonardo da Vinci", "content": "Learning never exhausts the mind."},
+            {"author": "Srinivasa Ramanujan", "content": "An equation for me has no meaning unless it expresses a thought of God."},
+            {"author": "Ada Lovelace", "content": "That brain of mine is something more than merely mortal; as time will show."},
+            {"author": "Hypatia", "content": "Reserve your right to think, for even to think wrongly is better than not to think at all."},
+            {"author": "Nikola Tesla", "content": "The present is theirs; the future, for which I really worked, is mine."},
+            {"author": "Rosalind Franklin", "content": "Science and everyday life cannot and should not be separated."},
+            {"author": "Isaac Newton", "content": "If I have seen further it is by standing on the shoulders of Giants."},
+            {"author": "Grace Hopper", "content": "The most dangerous phrase in the language is, 'We've always done it this way.'"}
+        ]
+
+        # Get session state for variety (author and style index)
+        cache_key = "regen_quote_state"
+        state = await cache_get(cache_key) or {"last_author": "", "last_style_idx": -1}
+        
+        quote_data = None
+        attempts = 0
+        
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            while attempts < 2:
+                attempts += 1
+                try:
+                    # minLength=50, maxLength=120 as requested
+                    resp = await client.get(f"https://api.quotable.io/random?tags={tags}&minLength=50&maxLength=120")
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        # Avoid overused authors if possible
+                        overused = ["Albert Einstein", "Plutarch", "Marcus Aurelius", "Socrates", "Benjamin Franklin"]
+                        if data["author"] == state.get("last_author") or (data["author"] in overused and attempts == 1):
+                            continue # Try again once
+                        quote_data = data
+                        break
+                except:
+                    break
+
+        if not quote_data:
+            # Fallback rotation
+            last_fallback_idx = state.get("last_fallback_idx", -1)
+            next_fallback_idx = (last_fallback_idx + 1) % len(fallback_quotes)
+            quote_data = fallback_quotes[next_fallback_idx]
+            state["last_fallback_idx"] = next_fallback_idx
+
+        # Style rotation
+        last_style_idx = state.get("last_style_idx", -1)
+        available_styles = [i for i in range(len(styles)) if i != last_style_idx]
+        style_idx = random.choice(available_styles)
+        
+        formatted_quote = styles[style_idx].format(
+            content=quote_data["content"].replace("«", "").replace("»", "").strip(), 
+            author=quote_data["author"]
+        )
+        
+        # Save state
+        state["last_author"] = quote_data["author"]
+        state["last_style_idx"] = style_idx
+        await cache_set(cache_key, state, ttl=3600)
+        
+        return formatted_quote
 
 search_service = SearchManager()

@@ -183,7 +183,7 @@ class ModelProvider:
                 messages=[{"role": "user", "content": prompt}],
                 model=target_model,
                 max_tokens=max_tokens,
-                temperature=0.7,
+                temperature=kwargs.get("temperature", 0.7),
                 timeout=30.0
             )
 
@@ -237,7 +237,7 @@ class ModelProvider:
                 messages=[{"role": "user", "content": prompt}],
                 model=target_model,
                 max_tokens=max_tokens,
-                temperature=0.7,
+                temperature=kwargs.get("temperature", 0.7),
                 stream=True,
                 timeout=30.0
             )

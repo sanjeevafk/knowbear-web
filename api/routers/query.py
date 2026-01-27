@@ -23,6 +23,8 @@ class QueryRequest(BaseModel):
     premium: bool = False
     mode: str = "ensemble"  # "fast", "ensemble", "deep_dive", "technical_depth"
     bypass_cache: bool = False
+    temperature: float = 0.7
+    regenerate: bool = False
 
 
 class QueryResponse(BaseModel):
@@ -173,7 +175,9 @@ async def query_topic_stream(
                 level, 
                 mode=req.mode, 
                 premium=req.premium,
-                is_pro=req.premium
+                is_pro=req.premium,
+                temperature=req.temperature,
+                regenerate=req.regenerate
             ):
                 full_content += chunk
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
