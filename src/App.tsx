@@ -4,6 +4,7 @@ import { Routes, Route } from 'react-router-dom'
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 const AppPage = lazy(() => import('./pages/AppPage'))
+const SuccessPage = lazy(() => import('./pages/SuccessPage'))
 
 export default function App() {
     return (
@@ -11,6 +12,7 @@ export default function App() {
             <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/app" element={<AppPage />} />
+                <Route path="/success" element={<SuccessPage />} />
             </Routes>
         </Suspense>
     )
