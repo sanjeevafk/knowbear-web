@@ -1,10 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import AppPage from './AppPage'
 import { useKnowBearStore } from '../store/useKnowBearStore'
+import { responseCache } from '../lib/responseCache'
 
 // Mock all dependencies
+vi.mock('../api', () => ({
+    getPinnedTopics: vi.fn(() => Promise.resolve([]))
+}))
+
+vi.mock('../lib/responseCache', () => ({
+    responseCache: {
+        get: vi.fn(() => null),
+        getStats: vi.fn(() => ({ count: 0, size: 0, compressionRatio: '0%' }))
+    }
+}))
+
 vi.mock('../hooks/useUsageGate', () => ({
     useUsageGate: () => ({
         checkAction: vi.fn(() => ({ allowed: true, downgraded: false })),
@@ -145,11 +157,13 @@ describe('AppPage Integration Tests', () => {
 
         // Set a result first
         const store = useKnowBearStore.getState()
-        store.setResult({
-            topic: 'test',
-            explanations: { eli5: 'content', eli10: 'more content' },
-            cached: false,
-            mode: 'fast'
+        act(() => {
+            store.setResult({
+                topic: 'test',
+                explanations: { eli5: 'content', eli10: 'more content' },
+                cached: false,
+                mode: 'fast'
+            })
         })
 
         await waitFor(() => {
@@ -302,11 +316,13 @@ describe('AppPage Integration Tests', () => {
         )
 
         const store = useKnowBearStore.getState()
-        store.setResult({
-            topic: 'test',
-            explanations: { eli5: 'content' },
-            cached: false,
-            mode: 'fast'
+        act(() => {
+            store.setResult({
+                topic: 'test',
+                explanations: { eli5: 'content' },
+                cached: false,
+                mode: 'fast'
+            })
         })
 
         unmount()
@@ -316,6 +332,10 @@ describe('AppPage Integration Tests', () => {
     })
 
     it('should handle mode changes via useEffect', async () => {
+        const mockStartSearch = vi.fn()
+        useKnowBearStore.setState({ startSearch: mockStartSearch })
+        vi.mocked(responseCache.get).mockReturnValue(null)
+
         render(
             <BrowserRouter>
                 <AppPage />
@@ -325,21 +345,24 @@ describe('AppPage Integration Tests', () => {
         const store = useKnowBearStore.getState()
 
         // Set initial result
-        store.setResult({
-            topic: 'blockchain',
-            explanations: { eli5: 'content' },
-            cached: false,
-            mode: 'fast'
+        act(() => {
+            store.setResult({
+                topic: 'blockchain',
+                explanations: { eli5: 'content' },
+                cached: false,
+                mode: 'fast'
+            })
+            store.setActiveTopic('blockchain')
         })
-        store.setActiveTopic('blockchain')
 
         // Change mode
-        store.setMode('ensemble')
+        act(() => {
+            store.setMode('ensemble')
+        })
 
         // Should trigger mode switch logic
         await waitFor(() => {
-            // Mode switching should be handled
-            expect(store.modeSwitching || store.result?.mode === 'ensemble').toBeTruthy()
+            expect(mockStartSearch).toHaveBeenCalled()
         })
     })
 })

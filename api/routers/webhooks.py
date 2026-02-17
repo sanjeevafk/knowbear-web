@@ -28,7 +28,7 @@ def handle_dodo_event(payload: dict, supabase):
     event_type = payload.get("event")
     data = payload.get("data", {})
 
-    logger.info("dodo_webhook_received", event=event_type, data=data)
+    logger.info("dodo_webhook_received", event_type=event_type, data=data)
 
     try:
         if event_type == "payment.succeeded":

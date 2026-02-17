@@ -21,7 +21,7 @@ async def test_conditional_rate_limit_calls_limiter(monkeypatch, test_settings):
 
     calls = {"count": 0}
 
-    async def fake_rate_limiter(*_args, **_kwargs):
+    def fake_rate_limiter(*_args, **_kwargs):
         async def _inner(_req, _resp):
             calls["count"] += 1
         return _inner

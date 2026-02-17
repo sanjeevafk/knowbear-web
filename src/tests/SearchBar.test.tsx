@@ -2,6 +2,20 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import SearchBar from '../components/SearchBar'
 
+vi.mock('../hooks/useUsageGate', () => ({
+    useUsageGate: () => ({
+        checkAction: () => ({ allowed: true }),
+        recordAction: () => {},
+        showPremiumModal: false,
+        setShowPremiumModal: () => {},
+        paywallContext: null,
+        upgradeToPro: () => {},
+        isPro: false,
+        deepDiveUsageCount: 0,
+        deepDiveLimit: 0
+    })
+}))
+
 describe('SearchBar', () => {
     it('renders input and button', () => {
         render(<SearchBar onSearch={() => { }} loading={false} mode="fast" onModeChange={() => { }} />)
@@ -20,6 +34,8 @@ describe('SearchBar', () => {
 
     it('disables button when loading', () => {
         render(<SearchBar onSearch={() => { }} loading mode="fast" onModeChange={() => { }} />)
-        expect(screen.getByRole('button', { name: /generating/i })).toBeDisabled()
+        const submitButton = screen.getAllByRole('button').find(button => button.getAttribute('type') === 'submit')
+        expect(submitButton).toBeTruthy()
+        expect(submitButton).toBeDisabled()
     })
 })

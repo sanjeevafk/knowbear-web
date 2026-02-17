@@ -2,6 +2,20 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import LevelDropdown from '../components/LevelDropdown'
 
+vi.mock('../hooks/useUsageGate', () => ({
+    useUsageGate: () => ({
+        checkAction: () => ({ allowed: true }),
+        recordAction: () => {},
+        showPremiumModal: false,
+        setShowPremiumModal: () => {},
+        paywallContext: null,
+        upgradeToPro: () => {},
+        isPro: false,
+        deepDiveUsageCount: 0,
+        deepDiveLimit: 0
+    })
+}))
+
 
 describe('LevelDropdown', () => {
     it('renders trigger button with selected label', () => {

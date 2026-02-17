@@ -163,6 +163,15 @@ describe('useKnowBearStore', () => {
 
             vi.mocked(responseCache.get).mockReturnValue(null)
 
+            act(() => {
+                result.current.setResult({
+                    topic: 'blockchain',
+                    explanations: {},
+                    cached: false,
+                    mode: 'fast'
+                })
+            })
+
             await act(async () => {
                 await result.current.fetchLevel('blockchain', 'eli5', 'fast', false)
             })
@@ -271,14 +280,18 @@ describe('useKnowBearStore', () => {
                 })
             })
 
-            const fetchPromise = act(async () => {
-                await result.current.fetchLevel('blockchain', 'eli5', 'fast', false)
+            let fetchPromise: Promise<void>
+            act(() => {
+                fetchPromise = result.current.fetchLevel('blockchain', 'eli5', 'fast', false)
             })
 
-            // During fetch, level should be in fetching set
-            expect(result.current.fetchingLevels.has('eli5')).toBe(true)
+            await waitFor(() => {
+                expect(result.current.fetchingLevels.has('eli5')).toBe(true)
+            })
 
-            await fetchPromise
+            await act(async () => {
+                await fetchPromise
+            })
 
             // After fetch, should be removed
             await waitFor(() => {

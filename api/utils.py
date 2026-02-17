@@ -21,7 +21,7 @@ def sanitize_topic(topic: str) -> str:
 
 def topic_cache_key(topic: str, level: str) -> str:
     """Generate cache key for topic+level."""
-    safe = re.sub(r"\W+", "_", topic.lower().strip())[:50]
+    safe = re.sub(r"\W+", "_", topic.lower().strip()).strip("_")[:50]
     return f"knowbear:{safe}:{level}"
 
 
