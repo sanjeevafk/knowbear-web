@@ -2,6 +2,13 @@
 
 AI-powered layered explanations for any topic. Built with FastAPI (Python) and React (TypeScript).
 
+## Status
+
+This repository is the deprecated **KnowBear v1** codebase, kept for historical reference.
+
+- Active repository (v2): `https://github.com/voidcommit-afk/know-bear`
+- This repo (v1): legacy snapshot, no active feature development
+
 ## Features
 
 - **Layered Explanations**: ELI5 to ELI15, meme-style, technical deep dives
