@@ -6,7 +6,7 @@ AI-powered layered explanations for any topic. Built with FastAPI (Python) and R
 
 This repository is the deprecated **KnowBear v1** codebase, kept for historical reference.
 
-- Active repository (v2): `https://github.com/voidcommit-afk/know-bear`
+- Active repository (v2): https://github.com/voidcommit-afk/know-bear
 - This repo (v1): legacy snapshot, no active feature development
 
 ## Features
