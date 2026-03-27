@@ -7,17 +7,33 @@ from prompts import JUDGE_PROMPT, JUDGE_MODEL, ENSEMBLE_MODELS, FAST_MODEL
 from services.inference import call_model, generate_explanation
 
 
-async def ensemble_generate(topic: str, level: str, use_premium: bool = False, mode: str = "ensemble") -> str:
+async def ensemble_generate(
+    topic: str,
+    level: str,
+    use_premium: bool = False,
+    mode: str = "ensemble",
+    retrieval: str | None = None,
+) -> str:
     """Generate with multiple models, pick best via judge."""
     if mode == "fast":
         # Fast mode: single model, no judge
         try:
-            return await generate_explanation(topic, level, FAST_MODEL, is_pro=use_premium)
+            return await generate_explanation(
+                topic,
+                level,
+                FAST_MODEL,
+                is_pro=use_premium,
+                mode="fast",
+                retrieval=retrieval,
+            )
         except Exception as e:
             raise RuntimeError(f"Fast model failed: {e}")
 
     models = ENSEMBLE_MODELS
-    tasks = [generate_explanation(topic, level, m, is_pro=use_premium) for m in models]
+    tasks = [
+        generate_explanation(topic, level, m, is_pro=use_premium, mode="ensemble", retrieval=retrieval)
+        for m in models
+    ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     valid = [(i, r) for i, r in enumerate(results) if isinstance(r, str) and r]
     if not valid:

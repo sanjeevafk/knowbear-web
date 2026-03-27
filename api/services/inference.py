@@ -55,7 +55,10 @@ async def generate_explanation(topic: str, level: str, model: str, **kwargs) -> 
         raise ValueError(f"Unknown level: {level}")
 
     prompt = template.format(topic=topic)
-    context = await search_service.get_search_context(topic, mode=mode)
+    retrieval = kwargs.get("retrieval")
+    if retrieval is None:
+        retrieval = "required" if mode == "ensemble" else "auto"
+    context = await search_service.get_search_context(topic, mode=mode, retrieval=retrieval)
 
     if context and context != "No external context found.":
         max_context_chars = 900 if mode == "fast" else 2600
@@ -81,7 +84,10 @@ async def generate_stream_explanation(topic: str, level: str, **kwargs):
         raise ValueError(f"Unknown level: {level}")
     prompt = template.format(topic=topic)
 
-    context = await search_service.get_search_context(topic, mode=mode)
+    retrieval = kwargs.get("retrieval")
+    if retrieval is None:
+        retrieval = "required" if mode == "ensemble" else "auto"
+    context = await search_service.get_search_context(topic, mode=mode, retrieval=retrieval)
     if context and context != "No external context found.":
         max_context_chars = 900 if mode == "fast" else 2600
         context_block = context[:max_context_chars]

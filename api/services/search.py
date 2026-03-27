@@ -1,6 +1,9 @@
+import asyncio
+import hashlib
 import random
+import re
+import time
 import httpx
-from typing import Dict, Any, Optional
 from config import get_settings
 from logging_config import logger
 
@@ -9,31 +12,164 @@ settings = get_settings()
 class SearchManager:
     def __init__(self):
         self.visual_keywords = {"diagram", "flowchart", "image", "photo", "visual", "graph", "chart"}
+        self.fast_timeout_seconds = 0.7
+        self.ensemble_timeout_seconds = 1.8
+        self.fast_cache_ttl_seconds = 300
+        self.ensemble_cache_ttl_seconds = 900
+        self._cache: dict[str, tuple[float, str]] = {}
+        self._in_flight: dict[str, asyncio.Task[str]] = {}
 
-    async def get_search_context(self, query: str, mode: str = "fast") -> str:
+    async def get_search_context(self, query: str, mode: str = "fast", retrieval: str | None = None) -> str:
         profile = "ensemble" if mode == "ensemble" else "fast"
+        retrieval_policy = retrieval or ("required" if profile == "ensemble" else "auto")
 
-        # Determine provider
-        provider = self._select_provider(query)
-        logger.info("search_provider_selected", provider=provider, query=query)
+        should_retrieve, reason = self._should_retrieve(query, retrieval_policy, profile)
+        logger.info(
+            "search_retrieval_decision",
+            mode=profile,
+            retrieval_policy=retrieval_policy,
+            should_retrieve=should_retrieve,
+            reason=reason,
+            query=query,
+        )
+        if not should_retrieve:
+            return "No external context found."
 
-        content = ""
+        cache_key = self._cache_key(query, profile)
+        cached = self._cache_get(cache_key, profile)
+        if cached:
+            logger.info("search_cache_hit", mode=profile, query=query)
+            return cached
+
+        timeout = self.fast_timeout_seconds if profile == "fast" else self.ensemble_timeout_seconds
+
+        existing_task = self._in_flight.get(cache_key)
+        if existing_task:
+            try:
+                content = await asyncio.wait_for(asyncio.shield(existing_task), timeout=timeout)
+                self._cache_set(cache_key, content, profile)
+                return content if content else "No external context found."
+            except Exception as e:
+                logger.warning("search_inflight_wait_failed", mode=profile, error=str(e))
+                return "No external context found."
+
+        task = asyncio.create_task(self._retrieve_with_strategy(query, profile))
+        self._in_flight[cache_key] = task
+
+        started = time.perf_counter()
         try:
-            if provider == "tavily":
-                content = await self._search_tavily(query, profile=profile)
-            elif provider == "serper":
-                content = await self._search_serper(query, profile=profile)
-            elif provider == "exa":
-                content = await self._search_exa(query, profile=profile)
+            content = await asyncio.wait_for(task, timeout=timeout)
         except Exception as e:
-            logger.error("search_provider_failed", provider=provider, error=str(e))
-            content = await self._fallback_search(query, failed_provider=provider, profile=profile)
+            logger.warning("search_timeout_or_failed", mode=profile, error=str(e), query=query)
+            return "No external context found."
+        finally:
+            self._in_flight.pop(cache_key, None)
 
-        if not content and content is not None:
-             # Try fallback if content is empty string (failure)
-             content = await self._fallback_search(query, failed_provider=provider, profile=profile)
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        logger.info("search_completed", mode=profile, latency_ms=elapsed_ms, used=bool(content), query=query)
+
+        if content:
+            self._cache_set(cache_key, content, profile)
 
         return content if content else "No external context found."
+
+    async def _retrieve_with_strategy(self, query: str, profile: str) -> str:
+        provider = self._select_provider(query)
+        logger.info("search_provider_selected", provider=provider, query=query, mode=profile)
+
+        if profile == "fast":
+            try:
+                return await self._search_with_provider(provider, query, profile)
+            except Exception as e:
+                logger.warning("search_fast_provider_failed", provider=provider, error=str(e), query=query)
+                return ""
+
+        # Ensemble path: try primary and fallback providers concurrently.
+        primary_task = asyncio.create_task(self._search_with_provider(provider, query, profile))
+        fallback_task = asyncio.create_task(self._fallback_search(query, failed_provider=provider, profile=profile))
+        tasks = [primary_task, fallback_task]
+        try:
+            for completed in asyncio.as_completed(tasks):
+                try:
+                    result = await completed
+                    if result:
+                        return result
+                except Exception as e:
+                    logger.warning("search_ensemble_provider_failed", error=str(e), query=query)
+            return ""
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+
+    async def _search_with_provider(self, provider: str, query: str, profile: str) -> str:
+        if provider == "tavily":
+            return await self._search_tavily(query, profile=profile)
+        if provider == "serper":
+            return await self._search_serper(query, profile=profile)
+        if provider == "exa":
+            return await self._search_exa(query, profile=profile)
+        return ""
+
+    def _cache_key(self, query: str, profile: str) -> str:
+        normalized = re.sub(r"\s+", " ", query.strip().lower())
+        digest = hashlib.sha256(normalized.encode()).hexdigest()
+        return f"{profile}:{digest}"
+
+    def _cache_get(self, key: str, profile: str) -> str | None:
+        hit = self._cache.get(key)
+        if not hit:
+            return None
+        expires_at, value = hit
+        if expires_at <= time.time():
+            self._cache.pop(key, None)
+            return None
+        return value
+
+    def _cache_set(self, key: str, value: str, profile: str) -> None:
+        ttl = self.fast_cache_ttl_seconds if profile == "fast" else self.ensemble_cache_ttl_seconds
+        self._cache[key] = (time.time() + ttl, value)
+
+    def _should_retrieve(self, query: str, policy: str, profile: str) -> tuple[bool, str]:
+        normalized_policy = policy.lower()
+        if normalized_policy in {"off", "false", "none"}:
+            return False, "policy_off"
+        if normalized_policy in {"required", "on", "always", "true"}:
+            return True, "policy_required"
+
+        # Auto: only retrieve when likely to benefit.
+        q = query.lower()
+        if profile == "ensemble":
+            return True, "ensemble_default"
+
+        # Fast mode auto heuristics: trigger retrieval only for freshness/factual risk.
+        retrieval_signals = [
+            "latest",
+            "today",
+            "current",
+            "price",
+            "news",
+            "update",
+            "202",
+            "who is",
+            "when",
+            "where",
+            "compare",
+            "vs",
+            "regulation",
+            "law",
+            "statistics",
+            "benchmark",
+            "release",
+        ]
+        if any(token in q for token in retrieval_signals):
+            return True, "auto_signal_match"
+
+        # Very short/evergreen prompts are usually fine without retrieval in fast mode.
+        if len(q.split()) <= 3:
+            return False, "auto_short_evergreen"
+
+        return False, "auto_default_skip"
 
     def _select_provider(self, query: str) -> str:
         # Check for visual keywords - favor Serper

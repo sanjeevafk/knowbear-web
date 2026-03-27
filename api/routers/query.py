@@ -21,6 +21,7 @@ class QueryRequest(BaseModel):
     topic: str = Field(..., min_length=1, max_length=200)
     levels: list[str] = Field(default=ALL_LEVELS)
     mode: str = "ensemble"
+    retrieval: str | None = Field(default=None, pattern="^(auto|required|on|off)?$")
     temperature: float = 0.7
     regenerate: bool = False
 
@@ -50,7 +51,7 @@ async def query_topic(req: QueryRequest) -> QueryResponse:
 
     explanations: dict[str, str] = {}
     logger.info("query_start_generation", topic=topic, levels=levels, mode=req.mode)
-    tasks = {level: ensemble_generate(topic, level, False, req.mode) for level in levels}
+    tasks = {level: ensemble_generate(topic, level, False, req.mode, req.retrieval) for level in levels}
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
     for level, result in zip(tasks.keys(), results):
@@ -92,6 +93,7 @@ async def query_topic_stream(req: QueryRequest):
                 topic,
                 level,
                 mode=req.mode,
+                retrieval=req.retrieval,
                 is_pro=False,
                 temperature=req.temperature,
                 regenerate=req.regenerate,
