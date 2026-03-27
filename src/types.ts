@@ -8,6 +8,7 @@ export interface QueryRequest {
     topic: string
     levels?: string[]
     mode?: 'fast' | 'ensemble'
+    retrieval?: 'auto' | 'required' | 'on' | 'off'
     temperature?: number
     regenerate?: boolean
 }
