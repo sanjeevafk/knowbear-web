@@ -14,7 +14,6 @@ from config import get_settings
 from logging_config import logger, setup_logging
 from rate_limit import enforce_ip_rate_limit
 from routers import export, pinned, query
-from services.cache import close_redis, get_redis
 from services.inference import close_client
 from services.model_provider import ModelError, ModelProvider, ModelUnavailable
 
@@ -24,19 +23,12 @@ async def lifespan(app: FastAPI):
     """App lifespan: startup/shutdown."""
     setup_logging()
 
-    try:
-        r = await get_redis()
-        r.ping()
-        logger.info("redis_connected")
-    except Exception as e:
-        logger.warning("redis_unavailable_continuing", error=str(e))
-
     provider = ModelProvider.get_instance()
     await provider.initialize()
     logger.info("startup", gemini_configured=provider.gemini_configured)
 
     yield
-    await asyncio.gather(close_redis(), close_client(), ModelProvider.get_instance().close())
+    await asyncio.gather(close_client(), ModelProvider.get_instance().close())
 
 
 app = FastAPI(
@@ -138,13 +130,6 @@ async def health():
         "timestamp": datetime.utcnow().isoformat(),
         "environment": settings.environment,
     }
-
-    try:
-        r = await get_redis()
-        r.ping()
-        status["redis"] = "healthy"
-    except Exception as e:
-        status["redis"] = f"unavailable: {str(e)}"
 
     try:
         from google import genai  # noqa: F401

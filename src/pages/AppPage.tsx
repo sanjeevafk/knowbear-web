@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { RefreshCcw } from 'lucide-react'
 import type { Level, Mode, PinnedTopic } from '../types'
 import { getPinnedTopics } from '../api'
-import { responseCache } from '../lib/responseCache'
 import SearchBar from '../components/SearchBar'
 import LevelDropdown from '../components/LevelDropdown'
 import ExplanationCard from '../components/ExplanationCard'
@@ -24,7 +23,6 @@ export default function AppPage() {
     const failedLevels = useKnowBearStore((state) => state.failedLevels)
     const isSidebarOpen = useKnowBearStore((state) => state.isSidebarOpen)
     const activeTopic = useKnowBearStore((state) => state.activeTopic)
-    const isFromCache = useKnowBearStore((state) => state.isFromCache)
     const loadingMeta = useKnowBearStore((state) => state.loadingMeta)
     const modeSwitching = useKnowBearStore((state) => state.modeSwitching)
 
@@ -34,7 +32,6 @@ export default function AppPage() {
     const setModeSwitching = useKnowBearStore((state) => state.setModeSwitching)
     const setResult = useKnowBearStore((state) => state.setResult)
     const setFetchingLevels = useKnowBearStore((state) => state.setFetchingLevels)
-    const setIsFromCache = useKnowBearStore((state) => state.setIsFromCache)
     const startSearch = useKnowBearStore((state) => state.startSearch)
     const fetchLevel = useKnowBearStore((state) => state.fetchLevel)
     const abortCurrentStream = useKnowBearStore((state) => state.abortCurrentStream)
@@ -43,7 +40,6 @@ export default function AppPage() {
     const [loadingPinned, setLoadingPinned] = useState(true)
 
     useEffect(() => {
-        responseCache.pruneInvalidModes(['fast', 'ensemble'])
         const timer = setTimeout(() => {
             getPinnedTopics()
                 .then((topics) => setPinnedTopics(topics))
@@ -58,22 +54,9 @@ export default function AppPage() {
         if (activeTopic && !loading && result && result.mode !== mode && !loadingMeta) {
             setModeSwitching(true)
             abortCurrentStream()
-
-            const cached = responseCache.get(activeTopic, mode)
-            if (cached) {
-                setResult(null)
-                setFetchingLevels(new Set())
-                setTimeout(() => {
-                    setResult({ topic: activeTopic, explanations: cached.explanations, cached: true, mode })
-                    setIsFromCache(true)
-                    setModeSwitching(false)
-                    setTimeout(() => setIsFromCache(false), 3000)
-                }, 50)
-            } else {
-                setResult(null)
-                setFetchingLevels(new Set())
-                handleSearch(activeTopic, false, mode).finally(() => setModeSwitching(false))
-            }
+            setResult(null)
+            setFetchingLevels(new Set())
+            handleSearch(activeTopic, false, mode).finally(() => setModeSwitching(false))
         }
     }, [mode, activeTopic, loading, result, loadingMeta])
 
@@ -115,18 +98,6 @@ export default function AppPage() {
                     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
                         <div className="space-y-4">
                             <SearchBar onSearch={(topic) => handleSearch(topic, false)} loading={loading} mode={mode} onModeChange={setMode} />
-
-                            {isFromCache && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0 }}
-                                    className="flex items-center gap-2 text-sm text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded-lg px-4 py-2"
-                                >
-                                    <span className="font-mono">⚡</span>
-                                    <span>Loaded from cache</span>
-                                </motion.div>
-                            )}
 
                             {modeSwitching && (
                                 <motion.div

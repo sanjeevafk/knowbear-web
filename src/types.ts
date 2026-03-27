@@ -7,7 +7,6 @@ export interface PinnedTopic {
 export interface QueryRequest {
     topic: string
     levels?: string[]
-    bypass_cache?: boolean
     mode?: 'fast' | 'ensemble'
     temperature?: number
     regenerate?: boolean
@@ -18,7 +17,6 @@ export type Mode = 'fast' | 'ensemble'
 export interface QueryResponse {
     topic: string
     explanations: Record<string, string>
-    cached: boolean
     mode?: Mode
 }
 

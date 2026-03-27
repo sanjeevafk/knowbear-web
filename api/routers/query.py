@@ -8,10 +8,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from logging_config import logger
-from services.cache import cache_get, cache_set
 from services.ensemble import ensemble_generate
 from services.inference import generate_stream_explanation
-from utils import FREE_LEVELS, PREMIUM_LEVELS, sanitize_topic, topic_cache_key
+from utils import FREE_LEVELS, PREMIUM_LEVELS, sanitize_topic
 
 router = APIRouter(tags=["query"])
 
@@ -22,7 +21,6 @@ class QueryRequest(BaseModel):
     topic: str = Field(..., min_length=1, max_length=200)
     levels: list[str] = Field(default=ALL_LEVELS)
     mode: str = "ensemble"
-    bypass_cache: bool = False
     temperature: float = 0.7
     regenerate: bool = False
 
@@ -30,7 +28,6 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     topic: str
     explanations: dict[str, str]
-    cached: bool = False
 
 
 def _normalize_mode(mode: str) -> str:
@@ -52,37 +49,19 @@ async def query_topic(req: QueryRequest) -> QueryResponse:
         levels = ["eli5"]
 
     explanations: dict[str, str] = {}
-    uncached: list[str] = []
-
-    if not req.bypass_cache:
-        for level in levels:
-            key = topic_cache_key(topic, level)
-            cached = await cache_get(key)
-            if cached:
-                explanations[level] = cached.get("text", "")
-            else:
-                uncached.append(level)
-    else:
-        uncached = levels
-
-    if not uncached and not req.bypass_cache:
-        return QueryResponse(topic=topic, explanations=explanations, cached=True)
-
-    logger.info("query_start_generation", topic=topic, levels=uncached, mode=req.mode)
-    tasks = {level: ensemble_generate(topic, level, False, req.mode) for level in uncached}
+    logger.info("query_start_generation", topic=topic, levels=levels, mode=req.mode)
+    tasks = {level: ensemble_generate(topic, level, False, req.mode) for level in levels}
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
     for level, result in zip(tasks.keys(), results):
         if isinstance(result, str):
             explanations[level] = result
-            key = topic_cache_key(topic, level)
-            await cache_set(key, {"text": result})
         else:
             error_msg = str(result) if result else "Unknown error"
             explanations[level] = f"Error generating {level}: {error_msg}"
             logger.error("query_generation_failed", level=level, error=error_msg)
 
-    return QueryResponse(topic=topic, explanations=explanations, cached=False)
+    return QueryResponse(topic=topic, explanations=explanations)
 
 
 @router.post("/query/stream")
@@ -104,19 +83,6 @@ async def query_topic_stream(req: QueryRequest):
 
         try:
             yield f"data: {json.dumps({'topic': topic, 'level': level})}\n\n"
-
-            if not req.bypass_cache:
-                cache_key = topic_cache_key(topic, level)
-                cached = await cache_get(cache_key)
-                if cached and cached.get("text"):
-                    content = cached["text"]
-                    chunk_size = 500
-                    for i in range(0, len(content), chunk_size):
-                        chunk = content[i : i + chunk_size]
-                        yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-                        await asyncio.sleep(0.01)
-                    yield "data: [DONE]\n\n"
-                    return
 
             token_count = 0
             chunk_count = 0
@@ -173,10 +139,6 @@ async def query_topic_stream(req: QueryRequest):
                 yield f"data: {json.dumps({'chunk': buffer})}\n\n"
 
             yield "data: [DONE]\n\n"
-
-            if full_content.strip():
-                cache_key = topic_cache_key(topic, level)
-                await cache_set(cache_key, {"text": full_content})
 
         except Exception as e:
             logger.error("streaming_failed", error=str(e), topic=topic)

@@ -17,7 +17,6 @@ This repository is currently configured as a **stateless, no-auth demo**:
   - `ensemble`: multi-model synthesis with judge selection
 - Streaming responses via SSE (`/api/query/stream`)
 - Export generated content as `.txt` or `.md`
-- Redis-backed response cache (best-effort; app still runs if Redis is unavailable)
 - Clean no-auth frontend flow: app loads directly at `/`
 
 ## Tech Stack
@@ -25,7 +24,6 @@ This repository is currently configured as a **stateless, no-auth demo**:
 - Frontend: React, Vite, TypeScript, Tailwind, Framer Motion, Zustand
 - Backend: FastAPI, Pydantic, Structlog
 - LLM routing: Groq + Gemini fallback paths
-- Cache: Redis
 
 ## Repository Structure
 
@@ -39,7 +37,7 @@ This repository is currently configured as a **stateless, no-auth demo**:
 │   │   ├── pinned.py        # GET /api/pinned
 │   │   ├── query.py         # POST /api/query, POST /api/query/stream
 │   │   └── export.py        # POST /api/export
-│   ├── services/            # inference/model/cache/search services
+│   ├── services/            # inference/model/search services
 │   ├── config.py            # environment settings
 │   └── tests/               # backend tests
 ├── src/
@@ -102,7 +100,6 @@ Minimum useful keys:
 
 - `GROQ_API_KEY`
 - `GEMINI_API_KEY` (optional fallback path)
-- `REDIS_URL` (optional but recommended for caching)
 - `VITE_API_URL`
 
 ## Running the App
