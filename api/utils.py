@@ -18,12 +18,5 @@ def sanitize_topic(topic: str) -> str:
         raise ValueError("Invalid characters in topic")
     return html.escape(topic)
 
-
-def topic_cache_key(topic: str, level: str) -> str:
-    """Generate cache key for topic+level."""
-    safe = re.sub(r"\W+", "_", topic.lower().strip()).strip("_")[:50]
-    return f"knowbear:{safe}:{level}"
-
-
 FREE_LEVELS = ["eli5", "eli10", "eli12", "eli15", "meme"]
 PREMIUM_LEVELS = ["classic60", "gentle70", "warm80"]

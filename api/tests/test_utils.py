@@ -1,6 +1,6 @@
 import pytest
 
-from utils import sanitize_topic, topic_cache_key
+from utils import sanitize_topic
 
 
 def test_sanitize_topic_valid():
@@ -20,8 +20,3 @@ def test_sanitize_topic_too_long():
 def test_sanitize_topic_missing():
     with pytest.raises(ValueError):
         sanitize_topic("")
-
-
-def test_topic_cache_key_format():
-    key = topic_cache_key("Hello World!", "eli5")
-    assert key == "knowbear:hello_world:eli5"

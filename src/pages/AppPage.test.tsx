@@ -59,7 +59,6 @@ describe('AppPage', () => {
         store.setResult({
             topic: 'blockchain',
             explanations: { eli5: 'Blockchain is like a digital ledger' },
-            cached: false,
             mode: 'fast',
         })
 

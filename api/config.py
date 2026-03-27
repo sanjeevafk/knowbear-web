@@ -13,8 +13,6 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     kaggle_api_token: str = ""
     gemini_api_key: str = ""
-    redis_url: str = "redis://localhost:6379"
-    cache_ttl: int = 86400
     rate_limit_per_ip_hour: int = 5
     tavily_api_key: str = ""
     serper_api_key: str = ""

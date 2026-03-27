@@ -1,9 +1,7 @@
-import hashlib
 import random
 import httpx
 from typing import Dict, Any, List, Optional
 from config import get_settings
-from services.cache import cache_get, cache_set
 from logging_config import logger
 
 settings = get_settings()
@@ -13,16 +11,6 @@ class SearchManager:
         self.visual_keywords = {"diagram", "flowchart", "image", "photo", "visual", "graph", "chart"}
 
     async def get_search_context(self, query: str) -> str:
-        # Check cache
-        try:
-            cache_key = f"search:{hashlib.sha256(query.encode()).hexdigest()}"
-            cached = await cache_get(cache_key)
-            if cached and isinstance(cached, dict) and "content" in cached:
-                logger.info("search_cache_hit", query=query)
-                return cached["content"]
-        except Exception as e:
-            logger.warning("cache_error_search", error=str(e))
-
         # Determine provider
         provider = self._select_provider(query)
         logger.info("search_provider_selected", provider=provider, query=query)
@@ -42,10 +30,6 @@ class SearchManager:
         if not content and content is not None:
              # Try fallback if content is empty string (failure)
              content = await self._fallback_search(query, failed_provider=provider)
-
-        # Cache result if valid
-        if content:
-            await cache_set(cache_key, {"content": content}, ttl=86400) # 24h default
 
         return content if content else "No external context found."
 
@@ -225,10 +209,6 @@ class SearchManager:
             {"author": "Grace Hopper", "content": "The most dangerous phrase in the language is, 'We've always done it this way.'"}
         ]
 
-        # Get session state for variety (author and style index)
-        cache_key = "regen_quote_state"
-        state = await cache_get(cache_key) or {"last_author": "", "last_style_idx": -1}
-        
         quote_data = None
         attempts = 0
         
@@ -242,7 +222,7 @@ class SearchManager:
                         data = resp.json()
                         # Avoid overused authors if possible
                         overused = ["Albert Einstein", "Plutarch", "Marcus Aurelius", "Socrates", "Benjamin Franklin"]
-                        if data["author"] == state.get("last_author") or (data["author"] in overused and attempts == 1):
+                        if data["author"] in overused and attempts == 1:
                             continue # Try again once
                         quote_data = data
                         break
@@ -250,26 +230,14 @@ class SearchManager:
                     break
 
         if not quote_data:
-            # Fallback rotation
-            last_fallback_idx = state.get("last_fallback_idx", -1)
-            next_fallback_idx = (last_fallback_idx + 1) % len(fallback_quotes)
-            quote_data = fallback_quotes[next_fallback_idx]
-            state["last_fallback_idx"] = next_fallback_idx
+            quote_data = random.choice(fallback_quotes)
 
-        # Style rotation
-        last_style_idx = state.get("last_style_idx", -1)
-        available_styles = [i for i in range(len(styles)) if i != last_style_idx]
-        style_idx = random.choice(available_styles)
+        style_idx = random.randrange(len(styles))
         
         formatted_quote = styles[style_idx].format(
             content=quote_data["content"].replace("«", "").replace("»", "").strip(), 
             author=quote_data["author"]
         )
-        
-        # Save state
-        state["last_author"] = quote_data["author"]
-        state["last_style_idx"] = style_idx
-        await cache_set(cache_key, state, ttl=3600)
         
         return formatted_quote
 
