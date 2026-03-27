@@ -7,6 +7,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from collections.abc import AsyncIterator, Iterator
+from typing import cast
+
 from logging_config import logger
 from services.ensemble import ensemble_generate
 from services.inference import generate_stream_explanation
@@ -21,7 +24,7 @@ class QueryRequest(BaseModel):
     topic: str = Field(..., min_length=1, max_length=200)
     levels: list[str] = Field(default=ALL_LEVELS)
     mode: str = "ensemble"
-    retrieval: str | None = Field(default=None, pattern="^(auto|required|on|off)?$")
+    retrieval: str | None = Field(default=None, pattern="^(auto|required|on|off)$")
     temperature: float = 0.7
     regenerate: bool = False
 
@@ -33,6 +36,17 @@ class QueryResponse(BaseModel):
 
 def _normalize_mode(mode: str) -> str:
     return mode if mode in {"fast", "ensemble"} else "fast"
+
+
+async def _stream_chunks(stream: AsyncIterator[str] | Iterator[str]):
+    if isinstance(stream, AsyncIterator):
+        async for chunk in stream:
+            yield chunk
+        return
+
+    for chunk in cast(Iterator[str], stream):
+        yield chunk
+        await asyncio.sleep(0)
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -89,7 +103,7 @@ async def query_topic_stream(req: QueryRequest):
             chunk_count = 0
             avg_chunk_size = 0.0
 
-            async for chunk in generate_stream_explanation(
+            stream = generate_stream_explanation(
                 topic,
                 level,
                 mode=req.mode,
@@ -97,7 +111,8 @@ async def query_topic_stream(req: QueryRequest):
                 is_pro=False,
                 temperature=req.temperature,
                 regenerate=req.regenerate,
-            ):
+            )
+            async for chunk in _stream_chunks(stream):
                 full_content += chunk
                 chunk_count += 1
                 avg_chunk_size = (avg_chunk_size * (chunk_count - 1) + len(chunk)) / chunk_count

@@ -231,7 +231,7 @@ class SearchManager:
 
     async def _search_exa(self, query: str, profile: str = "fast") -> str:
         if not settings.exa_api_key:
-             raise ValueError("Exa API key missing")
+            raise ValueError("Exa API key missing")
         max_results = 3 if profile == "fast" else 6
         snippet_chars = 200 if profile == "fast" else 500
              
@@ -322,7 +322,7 @@ class SearchManager:
                             continue # Try again once
                         quote_data = data
                         break
-                except:
+                except Exception:
                     break
 
         if not quote_data:

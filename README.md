@@ -73,7 +73,7 @@ npm run dev
 
 ## Usage
 
-1. Open the app at `/app`.
+1. Open the app at `http://localhost:5173/app` (or your configured frontend URL).
 2. Enter a topic.
 3. Choose mode:
    - `fast` for speed
