@@ -32,7 +32,12 @@ async def export_explanations(req: ExportRequest) -> StreamingResponse:
         tasks = {level: ensemble_generate(req.topic, level, False, req.mode) for level in missing_levels}
         results = await asyncio.gather(*tasks.values(), return_exceptions=True)
         for level, result in zip(tasks.keys(), results):
-            req.explanations[level] = result if isinstance(result, str) else f"Error generating content: {result}"
+            if isinstance(result, str):
+                req.explanations[level] = result
+            else:
+                # Log the actual exception for debugging
+                # logger.error(f"Failed to generate {level}: {result}")
+                req.explanations[level] = "Error generating content for this level."
 
     ordered_explanations = {}
     for level in ALL_LEVELS:

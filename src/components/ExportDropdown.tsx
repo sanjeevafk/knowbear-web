@@ -53,9 +53,13 @@ export default function ExportDropdown({ topic, explanations, compact = false, m
 
         if (format === 'copy') {
             const markdown = generateMarkdown()
-            await navigator.clipboard.writeText(markdown)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
+            try {
+                await navigator.clipboard.writeText(markdown)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+            } catch (err) {
+                console.error('Copy to clipboard failed:', err)
+            }
             return
         }
 

@@ -36,9 +36,13 @@ export default function Sidebar({ isOpen, onToggle, onSelectTopic }: SidebarProp
                 </button>
 
                 <div className={`p-4 flex items-center gap-3 border-b border-dark-700 ${!isOpen && 'justify-center'}`}>
-                    <div onClick={() => navigate('/')} className="cursor-pointer">
+                    <button
+                        onClick={() => navigate('/')}
+                        className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded"
+                        aria-label="Go to home"
+                    >
                         <img src="/favicon.svg" alt="Logo" className="w-8 h-8 drop-shadow-[0_0_8px_rgba(6,182,212,0.4)]" />
-                    </div>
+                    </button>
                     {isOpen && <span className="text-white font-bold text-lg tracking-tight">Know<span className="text-cyan-500">Bear</span></span>}
                 </div>
 

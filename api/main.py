@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
 
     try:
         r = await get_redis()
-        await r.ping()
+        r.ping()
         logger.info("redis_connected")
     except Exception as e:
         logger.warning("redis_unavailable_continuing", error=str(e))
@@ -52,7 +52,7 @@ app.add_middleware(
     allow_origins=[origin.strip() for origin in allowed_origins],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
-    allow_headers=["content-type", "x-forwarded-for"],
+    allow_headers=["content-type"],
     max_age=3600,
 )
 
@@ -141,7 +141,7 @@ async def health():
 
     try:
         r = await get_redis()
-        await r.ping()
+        r.ping()
         status["redis"] = "healthy"
     except Exception as e:
         status["redis"] = f"unavailable: {str(e)}"
