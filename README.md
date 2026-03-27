@@ -1,144 +1,90 @@
-# KnowBear (Stateless Demo)
+# KnowBear
 
-KnowBear is a FastAPI + React app that generates layered explanations for a topic using LLMs.
+KnowBear is a search-driven AI app that explains any topic in multiple readability levels. It supports two runtime modes:
 
-This repository is currently configured as a **stateless, no-auth demo**:
+- `fast` for low-latency responses
+- `ensemble` for higher-quality synthesis
 
-- no database models, migrations, or user persistence
-- no login/session/token flows
-- no pro/subscription/role gating
-- server-side rate limiting by IP (`5 requests/hour`) on query endpoints
+Both modes use the same retrieval entry point and enrich prompts with live web context before generation.
 
 ## Features
 
-- Layered explanations: `eli5`, `eli10`, `eli12`, `eli15`, `meme`, `classic60`, `gentle70`, `warm80`
-- Two generation modes:
-  - `fast`: single-model, lower latency
-  - `ensemble`: multi-model synthesis with judge selection
-- Streaming responses via SSE (`/api/query/stream`)
-- Export generated content as `.txt` or `.md`
-- Clean no-auth frontend flow: app loads directly at `/`
+- Search-driven explanation workflow
+- `fast` mode: quick response path
+- `ensemble` mode: multi-model generation with judge selection
+- Streaming responses over SSE
+- Export as `.txt` or `.md`
+- Rate limiting: **5 requests/hour per IP**
 
-## Tech Stack
+## Architecture (High Level)
 
-- Frontend: React, Vite, TypeScript, Tailwind, Framer Motion, Zustand
-- Backend: FastAPI, Pydantic, Structlog
-- LLM routing: Groq + Gemini fallback paths
-
-## Repository Structure
-
-```text
-.
-├── main.py                  # Root ASGI shim (supports `uvicorn main:app`)
-├── api/
-│   ├── main.py              # FastAPI app setup and router wiring
-│   ├── rate_limit.py        # In-memory IP limiter (5/hour)
-│   ├── routers/
-│   │   ├── pinned.py        # GET /api/pinned
-│   │   ├── query.py         # POST /api/query, POST /api/query/stream
-│   │   └── export.py        # POST /api/export
-│   ├── services/            # inference/model/search services
-│   ├── config.py            # environment settings
-│   └── tests/               # backend tests
-├── src/
-│   ├── api.ts               # frontend API client
-│   ├── pages/AppPage.tsx    # primary UI page
-│   ├── components/          # UI components
-│   ├── store/               # Zustand app state
-│   └── types.ts             # shared frontend types
-├── public/
-├── package.json
-└── .env.example
-```
+- Frontend: React + Vite UI for search, mode selection, streaming, and export
+- Backend: FastAPI API for query, stream, export, and health endpoints
+- LLM routing layer: provider abstraction for model routing/judging
+- LiteLLM proxy: optional external gateway integration point (not bundled in this repo)
+- Search API integration: Exa, Tavily, and Serper for retrieval context
 
 ## API Endpoints
 
-- `GET /api/pinned`
-  - Returns curated pinned topics.
-- `POST /api/query`
-  - Generates one or more explanation levels.
-- `POST /api/query/stream`
-  - Streams explanation chunks (SSE).
-- `POST /api/export`
-  - Returns exported explanation file (`txt` or `md`).
-- `GET /api/health`
-  - Health + dependency status.
+- `GET /api/pinned` -> curated starter topics
+- `POST /api/query` -> generate one or more levels
+- `POST /api/query/stream` -> stream generated text
+- `POST /api/export` -> export as `txt` or `md`
+- `GET /api/health` -> service status
 
-## Rate Limiting
+## Setup
 
-Rate limiting is enforced server-side on query routes by client IP:
-
-- limit: **5 requests per hour per IP**
-- exceeded response: **HTTP 429** with retry metadata in `detail`
-
-IP resolution order:
-
-1. `x-forwarded-for` (first IP)
-2. `request.client.host`
-
-## Local Setup
-
-### 1) Install frontend dependencies
+### 1) Install dependencies
 
 ```bash
 npm install
-```
-
-### 2) Install backend dependencies
-
-Use your preferred environment manager, then install:
-
-```bash
 pip install -r api/requirements.txt
 ```
 
-### 3) Configure environment
+### 2) Configure environment
 
-Copy `.env.example` to `.env` and set values as needed.
+Copy `.env.example` to `.env` and set required keys.
 
-Minimum useful keys:
+Required:
 
 - `GROQ_API_KEY`
-- `GEMINI_API_KEY` (optional fallback path)
 - `VITE_API_URL`
 
-## Running the App
+Recommended:
 
-### Backend (from repo root)
+- `GEMINI_API_KEY` (judge/fallback path)
+- `TAVILY_API_KEY`
+- `SERPER_API_KEY`
+- `EXA_API_KEY`
+
+### 3) Run the app
+
+Backend:
 
 ```bash
 python3 -m uvicorn main:app --reload
 ```
 
-Alternative:
-
-```bash
-python3 -m uvicorn api.main:app --reload
-```
-
-### Frontend
+Frontend:
 
 ```bash
 npm run dev
 ```
 
-## Validation Commands
+## Usage
+
+1. Open the app at `/app`.
+2. Enter a topic.
+3. Choose mode:
+   - `fast` for speed
+   - `ensemble` for stronger quality
+4. Read the streamed response and export if needed.
+
+## Validation
 
 ```bash
 npm run type-check
-npm run build
 npm test -- --run
-```
-
-Backend quick sanity checks:
-
-```bash
 python3 -m compileall -q api
 python3 -c "import main; print(bool(main.app))"
 ```
-
-## Notes
-
-- This demo is intentionally stateless and unauthenticated.
-- In-memory rate limiter state resets on process restart.
-- For multi-instance production deployments, move rate limiting to a shared store.

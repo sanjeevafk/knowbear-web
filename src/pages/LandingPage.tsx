@@ -20,14 +20,14 @@ export default function LandingPage() {
 
                 <nav className="hidden md:flex items-center gap-8 text-sm text-gray-300">
                     <a href="#how-it-works" className="hover:text-cyan-400 transition-colors">How it works</a>
-                    <a href="#demo-scope" className="hover:text-cyan-400 transition-colors">Demo scope</a>
+                    <a href="#workflow" className="hover:text-cyan-400 transition-colors">Workflow</a>
                 </nav>
 
                 <Link
                     to="/app"
                     className="px-5 py-2.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition-colors"
                 >
-                    Open Demo
+                    Try the App
                 </Link>
             </header>
 
@@ -40,9 +40,9 @@ export default function LandingPage() {
                             transition={{ duration: 0.5 }}
                             className="text-5xl md:text-7xl font-black tracking-tight leading-[0.95]"
                         >
-                            Layered Explanations,
+                            Search Any Topic,
                             <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">No Signup Required</span>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Get Clear Explanations Fast</span>
                         </motion.h1>
 
                         <motion.p
@@ -51,7 +51,7 @@ export default function LandingPage() {
                             transition={{ delay: 0.1, duration: 0.5 }}
                             className="mt-8 text-gray-300 text-lg md:text-xl max-w-3xl mx-auto"
                         >
-                            Enter any topic and get explanations at different difficulty levels, generated live with fast or ensemble mode.
+                            Ask a question, pull live retrieval context, and read structured explanations in either fast mode or ensemble mode.
                         </motion.p>
 
                         <motion.div
@@ -64,7 +64,7 @@ export default function LandingPage() {
                                 to="/app"
                                 className="inline-flex items-center gap-3 px-8 py-4 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-lg transition-colors"
                             >
-                                Start Using KnowBear
+                                Start Searching
                                 <ArrowRight className="w-5 h-5" />
                             </Link>
                         </motion.div>
@@ -75,13 +75,13 @@ export default function LandingPage() {
                     <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
                         <FeatureCard
                             icon={<Layers className="w-6 h-6 text-cyan-400" />}
-                            title="Layered learning"
-                            description="Switch between beginner-friendly and deeper explanation levels for the same topic."
+                            title="Search-driven answers"
+                            description="Each request enriches model output with live retrieval context from web search providers."
                         />
                         <FeatureCard
                             icon={<Zap className="w-6 h-6 text-blue-400" />}
-                            title="Fast or ensemble"
-                            description="Pick speed-focused output or higher-quality ensemble synthesis."
+                            title="Fast and ensemble"
+                            description="Use fast mode for low-latency responses or ensemble mode for stronger synthesis quality."
                         />
                         <FeatureCard
                             icon={<Download className="w-6 h-6 text-indigo-400" />}
@@ -91,16 +91,16 @@ export default function LandingPage() {
                     </div>
                 </section>
 
-                <section id="demo-scope" className="px-6 py-20">
+                <section id="workflow" className="px-6 py-20">
                     <div className="max-w-4xl mx-auto text-center">
-                        <h2 className="text-3xl md:text-4xl font-black tracking-tight">Demo Scope</h2>
+                        <h2 className="text-3xl md:text-4xl font-black tracking-tight">How It Flows</h2>
                         <p className="mt-4 text-gray-300">
-                            This is a public, stateless demo: no accounts, no saved user data, and no subscription gating.
-                            Query usage is rate-limited server-side per IP.
+                            Enter a topic, pick a mode, stream the response, then export the final explanation as markdown or text.
+                            Use fast mode when speed matters and ensemble mode when depth and consistency matter most.
                         </p>
                         <div className="mt-8">
                             <Link to="/app" className="text-cyan-400 hover:text-cyan-300 font-semibold">
-                                Go to the app →
+                                Try the app →
                             </Link>
                         </div>
                     </div>
@@ -110,9 +110,10 @@ export default function LandingPage() {
             <footer className="relative z-10 border-t border-white/10 py-8 px-6">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-400">
                     <span>© 2026 KnowBear Demo</span>
+                    <span>Stateless demo.</span>
                     <div className="flex items-center gap-6">
                         <Link to="/" className="hover:text-cyan-400 transition-colors">Home</Link>
-                        <Link to="/app" className="hover:text-cyan-400 transition-colors">Open App</Link>
+                        <Link to="/app" className="hover:text-cyan-400 transition-colors">Try the App</Link>
                     </div>
                 </div>
             </footer>
