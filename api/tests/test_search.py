@@ -12,7 +12,7 @@ async def test_search_context_returns_provider_result(monkeypatch):
         return "fresh-content"
 
     monkeypatch.setattr(manager, "_search_serper", fake_serper)
-    result = await manager.get_search_context("cats")
+    result = await manager.get_search_context("cats", mode="fast")
     assert result == "fresh-content"
 
 
@@ -36,12 +36,22 @@ async def test_search_context_fallback(monkeypatch):
     monkeypatch.setattr(manager, "_search_serper", ok)
     monkeypatch.setattr(manager, "_search_exa", fail)
 
-    result = await manager.get_search_context("topic")
+    result = await manager.get_search_context("topic", mode="ensemble")
     assert result == "fallback"
 
 
 @pytest.mark.asyncio
-async def test_get_images_no_api_key(monkeypatch):
+async def test_search_profile_controls_result_size(monkeypatch):
     manager = search_module.SearchManager()
-    images = await manager.get_images("topic")
-    assert images == []
+
+    called = {}
+
+    async def fake_tavily(_query, profile="fast"):
+        called["profile"] = profile
+        return "ok"
+
+    monkeypatch.setattr(manager, "_select_provider", lambda _q: "tavily")
+    monkeypatch.setattr(manager, "_search_tavily", fake_tavily)
+
+    await manager.get_search_context("topic", mode="ensemble")
+    assert called["profile"] == "ensemble"

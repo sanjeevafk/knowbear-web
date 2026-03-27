@@ -102,15 +102,8 @@ class ModelProvider:
         # Mode/Task based routing
         mode = kwargs.get("mode", "").lower()
         
-        # A. Coding / Technical / Technical Depth
-        if mode == "technical_depth":
-            # Return Gemini directly for best quality/depth as requested
-             if self.gemini_configured:
-                 return await self._call_gemini_direct(prompt, **kwargs)
-             target_model = "llama-3.3-70b-versatile"
-             max_tokens = 3000
-             
-        elif task == "coding" or "code" in task.lower():
+        # A. Coding / Technical
+        if task == "coding" or "code" in task.lower():
             target_model = "llama-3.3-70b-versatile"
             max_tokens = 2048
             
@@ -184,22 +177,13 @@ class ModelProvider:
         """Stream inference results for real-time UI."""
         mode = kwargs.get("mode", "").lower()
 
-        # Handle Technical Depth streaming
-        if mode == "technical_depth" and self.gemini_configured:
-            # Revert to Gemini for technical depth as requested
-            try:
-                # Use a specific stream implementation if needed, but for now we follow the existing pattern
-                # If we want literal Gemini streaming, we'd need to add it to genai client
-                # However, the user also mentioned "gpt oss to reduce latency"
-                target_model = "openai/gpt-oss-120b"
-                max_tokens = 3000
-            except Exception:
-                target_model = "llama-3.3-70b-versatile"
-                max_tokens = 3000
-        elif mode == "fast":
+        if mode == "fast":
              # Fast mode uses llama models only
              target_model = "llama-3.1-8b-instant"
              max_tokens = 1200  # Increased from 400 to prevent truncation
+        elif mode == "ensemble":
+            target_model = "llama-3.3-70b-versatile"
+            max_tokens = 1600
         else:
             target_model = "llama-3.1-8b-instant"
             max_tokens = 1024

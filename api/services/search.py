@@ -1,6 +1,6 @@
 import random
 import httpx
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from config import get_settings
 from logging_config import logger
 
@@ -10,7 +10,9 @@ class SearchManager:
     def __init__(self):
         self.visual_keywords = {"diagram", "flowchart", "image", "photo", "visual", "graph", "chart"}
 
-    async def get_search_context(self, query: str) -> str:
+    async def get_search_context(self, query: str, mode: str = "fast") -> str:
+        profile = "ensemble" if mode == "ensemble" else "fast"
+
         # Determine provider
         provider = self._select_provider(query)
         logger.info("search_provider_selected", provider=provider, query=query)
@@ -18,18 +20,18 @@ class SearchManager:
         content = ""
         try:
             if provider == "tavily":
-                content = await self._search_tavily(query)
+                content = await self._search_tavily(query, profile=profile)
             elif provider == "serper":
-                content = await self._search_serper(query)
+                content = await self._search_serper(query, profile=profile)
             elif provider == "exa":
-                content = await self._search_exa(query)
+                content = await self._search_exa(query, profile=profile)
         except Exception as e:
             logger.error("search_provider_failed", provider=provider, error=str(e))
-            content = await self._fallback_search(query, failed_provider=provider)
+            content = await self._fallback_search(query, failed_provider=provider, profile=profile)
 
         if not content and content is not None:
              # Try fallback if content is empty string (failure)
-             content = await self._fallback_search(query, failed_provider=provider)
+             content = await self._fallback_search(query, failed_provider=provider, profile=profile)
 
         return content if content else "No external context found."
 
@@ -50,16 +52,17 @@ class SearchManager:
         else:
             return "exa"
 
-    async def _search_tavily(self, query: str) -> str:
+    async def _search_tavily(self, query: str, profile: str = "fast") -> str:
         if not settings.tavily_api_key:
             raise ValueError("Tavily API key missing")
+        max_results = 3 if profile == "fast" else 6
         
         payload = {
             "api_key": settings.tavily_api_key,
             "query": query,
             "search_depth": "basic",
             "include_answer": True,
-            "max_results": 5
+            "max_results": max_results
         }
         async with httpx.AsyncClient(timeout=5.0) as client:  # Reduced from 10s to 5s
             resp = await client.post("https://api.tavily.com/search", json=payload)
@@ -69,9 +72,10 @@ class SearchManager:
             formatted = "\n".join([f"- {r['title']}: {r['content']} ({r['url']})" for r in results])
             return f"Answer: {data.get('answer', '')}\nSources:\n{formatted}"
 
-    async def _search_serper(self, query: str) -> str:
+    async def _search_serper(self, query: str, profile: str = "fast") -> str:
         if not settings.serper_api_key:
             raise ValueError("Serper API key missing")
+        max_results = 3 if profile == "fast" else 6
         
         headers = {
             'X-API-KEY': settings.serper_api_key,
@@ -86,12 +90,14 @@ class SearchManager:
             resp.raise_for_status()
             data = resp.json()
             organic = data.get("organic", [])
-            formatted = "\n".join([f"- {r.get('title')}: {r.get('snippet')} ({r.get('link')})" for r in organic[:5]])
+            formatted = "\n".join([f"- {r.get('title')}: {r.get('snippet')} ({r.get('link')})" for r in organic[:max_results]])
             return formatted
 
-    async def _search_exa(self, query: str) -> str:
+    async def _search_exa(self, query: str, profile: str = "fast") -> str:
         if not settings.exa_api_key:
              raise ValueError("Exa API key missing")
+        max_results = 3 if profile == "fast" else 6
+        snippet_chars = 200 if profile == "fast" else 500
              
         headers = {
             "x-api-key": settings.exa_api_key,
@@ -101,15 +107,15 @@ class SearchManager:
             resp = await client.post(
                 "https://api.exa.ai/search",
                 headers=headers,
-                json={"query": query, "numResults": 5, "contents": {"text": True}}
+                json={"query": query, "numResults": max_results, "contents": {"text": True}}
             )
             resp.raise_for_status()
             data = resp.json()
             results = data.get("results", [])
-            formatted = "\n".join([f"- {r.get('title')}: {r.get('text', '')[:300]}... ({r.get('url')})" for r in results])
+            formatted = "\n".join([f"- {r.get('title')}: {r.get('text', '')[:snippet_chars]}... ({r.get('url')})" for r in results])
             return formatted
 
-    async def _fallback_search(self, query: str, failed_provider: str) -> str:
+    async def _fallback_search(self, query: str, failed_provider: str, profile: str = "fast") -> str:
         """Optimized parallel fallback with faster timeout."""
         import asyncio
         
@@ -121,11 +127,11 @@ class SearchManager:
         tasks = []
         for p in providers:
             if p == "tavily":
-                tasks.append(self._search_tavily(query))
+                tasks.append(self._search_tavily(query, profile=profile))
             elif p == "serper":
-                tasks.append(self._search_serper(query))
+                tasks.append(self._search_serper(query, profile=profile))
             elif p == "exa":
-                tasks.append(self._search_exa(query))
+                tasks.append(self._search_exa(query, profile=profile))
         
         # Return first successful result
         for coro in asyncio.as_completed(tasks):
@@ -138,52 +144,6 @@ class SearchManager:
                 continue
         
         return ""
-
-    async def get_images(self, query: str) -> List[Dict[str, str]]:
-        # Fallback to Serper Images if Unsplash key is missing or logic dictates
-        # This implementation uses Serper for simplicity as Unsplash key was not provided
-        if not settings.serper_api_key:
-            return []
-            
-        headers = {
-            'X-API-KEY': settings.serper_api_key,
-            'Content-Type': 'application/json'
-        }
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.post(
-                    "https://google.serper.dev/images",
-                    headers=headers,
-                    json={"q": query}
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                images = data.get("images", [])
-                return [{"url": img["imageUrl"], "title": img["title"]} for img in images[:3]]
-        except Exception as e:
-            logger.error("image_search_failed", error=str(e))
-            return []
-
-    async def get_quote(self) -> str:
-        # Simple quote for loading messages
-        tags = "education|knowledge|learning|science|wisdom|research|effort|creativity"
-        try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(f"https://api.quotable.io/random?tags={tags}&maxLength=100")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    return f"«{data['content']}» — {data['author']}"
-        except:
-            pass
-        
-        fallbacks = [
-            "The mind is not a vessel to be filled, but a fire to be kindled. — Plutarch",
-            "An investment in knowledge pays the best interest. — Benjamin Franklin",
-            "Wisdom is not a product of schooling but of the lifelong attempt to acquire it. — Albert Einstein",
-            "The important thing is not to stop questioning. Curiosity has its own reason for existence. — Albert Einstein",
-            "Live as if you were to die tomorrow. Learn as if you were to live forever. — Mahatma Gandhi"
-        ]
-        return random.choice(fallbacks)
 
     async def get_regeneration_quote(self) -> str:
         """Specialized quote fetching for regenerated answers with style variety."""

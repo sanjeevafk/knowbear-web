@@ -19,7 +19,11 @@ async def test_generate_stream_explanation_regenerate_appends_quote(monkeypatch)
     async def fake_quote():
         return "---\n*\"Quote\"*"
 
+    async def fake_search_context(_topic, mode="fast"):
+        return ""
+
     monkeypatch.setattr(model_provider.ModelProvider, "get_instance", classmethod(lambda cls: DummyProvider()))
+    monkeypatch.setattr(inference_module.search_service, "get_search_context", fake_search_context)
     monkeypatch.setattr(inference_module.search_service, "get_regeneration_quote", fake_quote)
 
     chunks = []

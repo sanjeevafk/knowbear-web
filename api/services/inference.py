@@ -1,10 +1,8 @@
-"""Groq inference service."""
+"""Inference service."""
 
-import asyncio
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from config import get_settings
-from prompts import PROMPTS, TECHNICAL_DEPTH_PROMPT
+from prompts import PROMPTS
 from logging_config import logger
 from services.search import search_service
 
@@ -48,66 +46,50 @@ async def call_model(model: str, prompt: str, max_tokens: int = 1024, **kwargs) 
 
 async def generate_explanation(topic: str, level: str, model: str, **kwargs) -> str:
     """Generate explanation for topic at given level."""
-    mode = kwargs.get("mode", "ensemble")
-    
-    if mode == "technical_depth":
-        search_task = search_service.get_search_context(topic)
-        image_task = search_service.get_images(topic)
-        quote_task = search_service.get_quote()
-        
-        context, images, quote = await asyncio.gather(search_task, image_task, quote_task)
-        
-        prompt = TECHNICAL_DEPTH_PROMPT.format(
-            search_context=context,
-            quote_text=quote if quote else "No specific quote found.",
-            topic=topic
-        )
-        
-        response = await call_model(model, prompt, **kwargs)
-        
-        # Append images if available
-        if images:
-             response += "\n\n### Visual References\n"
-             for img in images:
-                 response += f"![{img.get('title', 'Image')}]({img['url']})\n"
-        
-        return response
+    mode = kwargs.get("mode", "ensemble").lower()
+    if mode not in {"fast", "ensemble"}:
+        mode = "fast"
 
     template = PROMPTS.get(level)
     if not template:
         raise ValueError(f"Unknown level: {level}")
-        
+
     prompt = template.format(topic=topic)
-        
+    context = await search_service.get_search_context(topic, mode=mode)
+
+    if context and context != "No external context found.":
+        max_context_chars = 900 if mode == "fast" else 2600
+        context_block = context[:max_context_chars]
+        prompt += (
+            "\n\nExternal context (web retrieval):\n"
+            f"{context_block}\n\n"
+            "Use this context only when relevant and do not invent sources."
+        )
+
     return await call_model(model, prompt, **kwargs)
 
 
 async def generate_stream_explanation(topic: str, level: str, **kwargs):
     """Stream explanation for topic at given level."""
     from services.model_provider import ModelProvider
-    mode = kwargs.get("mode", "ensemble")
-    
-    prompt = ""
-    images = []
+    mode = kwargs.get("mode", "ensemble").lower()
+    if mode not in {"fast", "ensemble"}:
+        mode = "fast"
 
-    if mode == "technical_depth":
-        search_task = search_service.get_search_context(topic)
-        image_task = search_service.get_images(topic)
-        quote_task = search_service.get_quote()
-        
-        context, images_result, quote = await asyncio.gather(search_task, image_task, quote_task)
-        images = images_result
-        
-        prompt = TECHNICAL_DEPTH_PROMPT.format(
-            search_context=context,
-            quote_text=quote if quote else "No specific quote found.",
-            topic=topic
+    template = PROMPTS.get(level)
+    if not template:
+        raise ValueError(f"Unknown level: {level}")
+    prompt = template.format(topic=topic)
+
+    context = await search_service.get_search_context(topic, mode=mode)
+    if context and context != "No external context found.":
+        max_context_chars = 900 if mode == "fast" else 2600
+        context_block = context[:max_context_chars]
+        prompt += (
+            "\n\nExternal context (web retrieval):\n"
+            f"{context_block}\n\n"
+            "Use this context only when relevant and do not invent sources."
         )
-    else:
-        template = PROMPTS.get(level)
-        if not template:
-            raise ValueError(f"Unknown level: {level}")
-        prompt = template.format(topic=topic)
     
     provider = ModelProvider.get_instance()
     async for chunk in provider.route_inference_stream(prompt, **kwargs):
@@ -117,9 +99,3 @@ async def generate_stream_explanation(topic: str, level: str, **kwargs):
     if kwargs.get("regenerate"):
         quote = await search_service.get_regeneration_quote()
         yield f"\n\n{quote}"
-
-    # Append images at the end of the stream for technical depth
-    if mode == "technical_depth" and images:
-        yield "\n\n### Visual References\n"
-        for img in images:
-            yield f"![{img.get('title', 'Image')}]({img['url']})\n"
