@@ -1,7 +1,5 @@
 """Model provider abstraction."""
 
-import os
-import httpx
 import re
 from groq import AsyncGroq
 from google import genai
@@ -45,9 +43,6 @@ class ModelProvider:
                 print(f"Groq init failed: {e}")
         
 
-        self.hf_token = os.getenv("HF_TOKEN")
-        self.http_client = httpx.AsyncClient(timeout=15.0)
-
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
@@ -56,7 +51,7 @@ class ModelProvider:
     
     async def close(self):
         """Close clients."""
-        await self.http_client.aclose()
+        return None
 
     
     async def initialize(self):
@@ -100,23 +95,7 @@ class ModelProvider:
                  print(f"Gemini Heavy Failed: {e}")
                  raise ModelError(f"Gemini generation failed: {e}")
 
-        # 2. NICHE CLASSIFICATION PATH (Hugging Face via HTTPX)
-        if task == "classification" and self.hf_token:
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english",
-                        headers={"Authorization": f"Bearer {self.hf_token}"},
-                        json={"inputs": prompt},
-                        timeout=5.0
-                    )
-                    response.raise_for_status()
-                    return {"provider": "hf", "model": "distilbert", "content": str(response.json())}
-            except Exception as e:
-                print(f"HF Error: {e}") 
-                pass 
-
-        # 3. INTELLIGENT ROUTING (Groq)
+        # 2. INTELLIGENT ROUTING (Groq)
         target_model = "llama-3.1-8b-instant" # Default for speed/simple tasks
         max_tokens = 1024
         
@@ -155,7 +134,9 @@ class ModelProvider:
         req_model = kwargs.get("model")
         if req_model:
             if req_model == "gemini":
-                return await self._call_gemini_direct(prompt, **kwargs)
+                return await self._call_gemini_direct(prompt, model_name="gemini-2.0-flash", **kwargs)
+            elif isinstance(req_model, str) and req_model.startswith("gemini-"):
+                return await self._call_gemini_direct(prompt, model_name=req_model, **kwargs)
             elif req_model in [
                 "llama-3.1-8b-instant", 
                 "llama-3.3-70b-versatile", 
@@ -171,7 +152,7 @@ class ModelProvider:
 
         # 5. EXECUTION
         if not self.groq_client:
-             return await self._fallback_chain(prompt)
+             return await self._fallback_to_gemini(prompt)
 
         is_pro = kwargs.get("is_pro", False) or kwargs.get("premium", False)
         # Apply word cap for fast modes even if pro (user's request)
@@ -196,8 +177,8 @@ class ModelProvider:
             return {"provider": "groq", "model": target_model, "content": content}
         
         except Exception as e:
-            print(f"Groq Error ({target_model}): {e}. Initiating Fallback Chain.")
-            return await self._fallback_chain(prompt)
+            print(f"Groq Error ({target_model}): {e}. Initiating Gemini fallback.")
+            return await self._fallback_to_gemini(prompt)
 
     async def route_inference_stream(self, prompt: str, **kwargs):
         """Stream inference results for real-time UI."""
@@ -228,7 +209,7 @@ class ModelProvider:
 
         if not self.groq_client:
             # Fallback for now just returns full text as a single chunk if streaming is unavailable
-            res = await self._fallback_chain(prompt)
+            res = await self._fallback_to_gemini(prompt)
             yield res["content"]
             return
 
@@ -278,38 +259,12 @@ class ModelProvider:
         
         except Exception as e:
             print(f"Groq Streaming Error: {e}")
-            res = await self._fallback_chain(prompt)
+            res = await self._fallback_to_gemini(prompt)
             yield res["content"]
-
-    async def _fallback_chain(self, prompt: str) -> dict:
-        """
-        Fallback Strategy:
-        1. Phi-3 (HF Serverless via HTTPX)
-        2. Gemini Flash Lite (Google)
-        """
-        if self.hf_token:
-            try:
-                response = await self.http_client.post(
-                    "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct",
-                    headers={"Authorization": f"Bearer {self.hf_token}"},
-                    json={
-                        "inputs": f"<|user|>\n{prompt}<|end|>\n<|assistant|>",
-                        "parameters": {"max_new_tokens": 1024, "return_full_text": False}
-                    }
-                )
-                response.raise_for_status()
-                result_json = response.json()
-                # HF Inference API returns list of dicts with 'generated_text'
-                content = result_json[0].get('generated_text', '') if isinstance(result_json, list) else str(result_json)
-                return {"provider": "hf-fallback", "model": "phi-3", "content": content}
-            except Exception as e:
-                print(f"Phi-3 Fallback Failed: {repr(e)}")
-
-        return await self._fallback_to_gemini(prompt)
 
     async def _fallback_to_gemini(self, prompt: str) -> dict:
         if not self.gemini_configured:
-            raise ModelUnavailable("All providers (Groq, HF, Gemini) failed or configured incorrectly.")
+            raise ModelUnavailable("All providers (Groq, Gemini) failed or configured incorrectly.")
         
         try:
             model_name = "gemini-2.0-flash"
@@ -326,17 +281,17 @@ class ModelProvider:
         except Exception as e:
              raise ModelError(f"Critical: Fallback Gemini generation failed: {str(e)}")
 
-    async def _call_gemini_direct(self, prompt: str, **kwargs) -> dict:
+    async def _call_gemini_direct(self, prompt: str, model_name: str = "gemini-2.0-flash", **kwargs) -> dict:
         """Legacy direct call."""
         if not self.gemini_configured:
             raise ModelUnavailable("Gemini is not configured.")
         
         try:
             response = await self.gemini_client.aio.models.generate_content(
-                model='gemini-2.0-flash',
+                model=model_name,
                 contents=prompt,
                 config={"http_options": {"timeout": 30000}}
             )
-            return {"provider": "google", "model": "gemini-2.0-flash", "content": response.text}
+            return {"provider": "google", "model": model_name, "content": response.text}
         except Exception as e:
             raise ModelError(f"Gemini generation failed: {str(e)}")

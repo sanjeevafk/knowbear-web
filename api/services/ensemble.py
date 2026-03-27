@@ -3,7 +3,7 @@
 import asyncio
 import json
 import re
-from prompts import JUDGE_PROMPT, JUDGE_MODEL, FREE_MODELS, PREMIUM_MODELS, FAST_MODEL
+from prompts import JUDGE_PROMPT, JUDGE_MODEL, ENSEMBLE_MODELS, FAST_MODEL
 from services.inference import call_model, generate_explanation
 
 
@@ -16,7 +16,7 @@ async def ensemble_generate(topic: str, level: str, use_premium: bool = False, m
         except Exception as e:
             raise RuntimeError(f"Fast model failed: {e}")
 
-    models = PREMIUM_MODELS if use_premium else FREE_MODELS
+    models = ENSEMBLE_MODELS
     tasks = [generate_explanation(topic, level, m, is_pro=use_premium) for m in models]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     valid = [(i, r) for i, r in enumerate(results) if isinstance(r, str) and r]
@@ -34,10 +34,16 @@ async def judge_responses(topic: str, responses: list[str]) -> str:
     resp_text = "\n".join(f"[{i}]: {r[:1500]}" for i, r in enumerate(responses))
     prompt = JUDGE_PROMPT.format(topic=topic, responses=resp_text)
     try:
-        # Increase tokens for reason
-        result = await call_model(JUDGE_MODEL, prompt, max_tokens=200)
-        match = re.search(r'"best"\s*:\s*(\d+)', result)
-        idx = int(match.group(1)) if match else 0
+        result = await call_model(JUDGE_MODEL, prompt, max_tokens=256)
+        # Gemini can wrap JSON in markdown fences; normalize before parsing.
+        cleaned = result.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        try:
+            parsed = json.loads(cleaned)
+            idx = int(parsed.get("best", 0))
+        except Exception:
+            # Regex fallback if model returns non-strict JSON.
+            match = re.search(r'"best"\s*:\s*(\d+)', result)
+            idx = int(match.group(1)) if match else 0
         return responses[min(idx, len(responses) - 1)]
     except Exception:
         return responses[0]

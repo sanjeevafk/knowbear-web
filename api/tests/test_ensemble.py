@@ -15,7 +15,7 @@ async def test_ensemble_fast_mode(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ensemble_judges_responses(monkeypatch):
-    monkeypatch.setattr(ensemble_module, "FREE_MODELS", ["m1", "m2"])
+    monkeypatch.setattr(ensemble_module, "ENSEMBLE_MODELS", ["m1", "m2"])
 
     async def fake_generate_explanation(_topic, _level, model, **_kwargs):
         return "resp1" if model == "m1" else "resp2"
@@ -33,7 +33,7 @@ async def test_ensemble_judges_responses(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ensemble_all_models_fail(monkeypatch):
-    monkeypatch.setattr(ensemble_module, "FREE_MODELS", ["m1", "m2"])
+    monkeypatch.setattr(ensemble_module, "ENSEMBLE_MODELS", ["m1", "m2"])
 
     async def fake_generate_explanation(_topic, _level, _model, **_kwargs):
         raise RuntimeError("fail")
