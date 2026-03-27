@@ -60,11 +60,10 @@ JUDGE_PROMPT = """Rate these responses for "{topic}" on coherence (1-5), accurac
 {responses}
 Output JSON: {{"best": 0|1, "reason": "brief"}}"""
 
-# Model configs for Groq
-FREE_MODELS = ["llama-3.1-8b-instant"]
-PREMIUM_MODELS = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "deepseek-r1-distill-llama-70b", "mixtral-8x7b-32768"]
-JUDGE_MODEL = "llama-3.3-70b-versatile"
+# Model configs
 FAST_MODEL = "llama-3.1-8b-instant"
+ENSEMBLE_MODELS = ["llama-3.3-70b-versatile", "openai/gpt-oss-20b"]
+JUDGE_MODEL = "gemini-2.5-flash"
 
 TECHNICAL_DEPTH_PROMPT = """
 You are an expert academic researcher and tutor.
