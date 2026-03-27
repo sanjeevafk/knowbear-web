@@ -69,6 +69,8 @@ describe('useKnowBearStore', () => {
         await waitFor(() => {
             expect(responseCache.set).toHaveBeenCalled()
         })
-        expect(result.current.result?.topic).toBe('blockchain')
+        await waitFor(() => {
+            expect(result.current.result?.topic).toBe('blockchain')
+        })
     })
 })

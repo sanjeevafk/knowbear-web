@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
+const LandingPage = lazy(() => import('./pages/LandingPage'))
 const AppPage = lazy(() => import('./pages/AppPage'))
 
 export default function App() {
@@ -9,7 +10,7 @@ export default function App() {
         <ErrorBoundary>
             <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>}>
                 <Routes>
-                    <Route path="/" element={<AppPage />} />
+                    <Route path="/" element={<LandingPage />} />
                     <Route path="/app" element={<AppPage />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
