@@ -11,6 +11,7 @@ import MobileBottomNav from '../components/MobileBottomNav'
 import { LoadingState } from '../components/LoadingState'
 import PinnedTopics from '../components/PinnedTopics'
 import { useKnowBearStore } from '../store/useKnowBearStore'
+import V2FloatingButton from '../components/V2FloatingButton'
 
 export default function AppPage() {
     const loading = useKnowBearStore((state) => state.loading)
@@ -182,6 +183,8 @@ export default function AppPage() {
                     onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
                     mode={mode}
                 />
+                
+                <V2FloatingButton persistent />
             </main>
         </div>
     )
