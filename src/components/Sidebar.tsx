@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Github } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Github, Zap } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -90,17 +90,32 @@ export default function Sidebar({ isOpen, onToggle, onSelectTopic }: SidebarProp
                     ) : null}
                 </nav>
 
-                <div className={`p-4 border-t border-dark-700 flex flex-wrap items-center ${isOpen ? 'justify-between' : 'justify-center'}`}>
-                    {isOpen && <span className="text-[10px] text-gray-600 font-mono">Demo Mode</span>}
+                <div className={`p-4 border-t border-dark-700 flex flex-col gap-4 ${isOpen ? 'items-start' : 'items-center'}`}>
                     <a
-                        href="https://github.com/voidcommit-afk/KnowBear-v1"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-cyan-400 transition-colors"
-                        aria-label="GitHub repository"
+                        href="https://knowbear.app"
+                        className="group flex items-center gap-3 w-full px-3 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/40 transition-all duration-300"
                     >
-                        <Github className="w-5 h-5" />
+                        <Zap className={`w-5 h-5 shrink-0 ${isOpen ? 'animate-pulse' : ''}`} />
+                        {isOpen && (
+                            <div className="flex flex-col">
+                                <span className="text-xs font-black tracking-tight leading-tight">Switch to v2</span>
+                                <span className="text-[10px] text-cyan-500/60 font-semibold leading-tight">New Era</span>
+                            </div>
+                        )}
                     </a>
+
+                    <div className={`flex w-full items-center ${isOpen ? 'justify-between' : 'justify-center'}`}>
+                        {isOpen && <span className="text-[10px] text-gray-600 font-mono">Demo Mode</span>}
+                        <a
+                            href="https://github.com/voidcommit-afk/KnowBear-v1"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-cyan-400 transition-colors"
+                            aria-label="GitHub repository"
+                        >
+                            <Github className="w-5 h-5" />
+                        </a>
+                    </div>
                 </div>
             </motion.aside>
         </>

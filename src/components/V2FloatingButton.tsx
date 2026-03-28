@@ -4,19 +4,22 @@ import { ArrowRight, Zap, X } from 'lucide-react'
 
 interface V2FloatingButtonProps {
     v2Url?: string
+    persistent?: boolean
 }
 
-export default function V2FloatingButton({ v2Url = "https://knowbear.app" }: V2FloatingButtonProps) {
-    const [isVisible, setIsVisible] = useState(false)
+export default function V2FloatingButton({ v2Url = "https://knowbear.app", persistent = false }: V2FloatingButtonProps) {
+    const [isVisible, setIsVisible] = useState(persistent)
     const [isDismissed, setIsDismissed] = useState(false)
 
     useEffect(() => {
+        if (persistent) return;
+
         const dismissed = localStorage.getItem('knowbear-v2-floating-dismissed')
         if (!dismissed) {
             const timer = setTimeout(() => setIsVisible(true), 3000)
             return () => clearTimeout(timer)
         }
-    }, [])
+    }, [persistent])
 
     const handleDismiss = (e: React.MouseEvent) => {
         e.preventDefault()
@@ -56,13 +59,15 @@ export default function V2FloatingButton({ v2Url = "https://knowbear.app" }: V2F
                             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </div>
 
-                        {/* Close button inside */}
-                        <button 
-                            onClick={handleDismiss}
-                            className="absolute top-1 right-1 p-1 rounded-full hover:bg-white/10 text-zinc-600 hover:text-white transition-all opacity-0 group-hover:opacity-100"
-                        >
-                            <X className="w-3 h-3" />
-                        </button>
+                        {/* Close button inside - show only if not persistent */}
+                        {!persistent && (
+                            <button
+                                onClick={handleDismiss}
+                                className="absolute top-1 right-1 p-1 rounded-full hover:bg-white/10 text-zinc-600 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        )}
                     </a>
                 </motion.div>
             )}

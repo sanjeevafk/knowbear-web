@@ -78,10 +78,30 @@ export default function V2RedirectModal({ v2Url = "https://knowbear.app" }: V2Re
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.2 }}
-                                className="text-zinc-400 text-lg leading-relaxed mb-10 max-w-[340px]"
+                                className="text-zinc-400 text-lg leading-relaxed mb-6 max-w-[380px]"
                             >
-                                Experience the next generation of intelligence. Faster synthesis, cleaner design, and all-new RAG engine.
+                                Experience the next generation of intelligence with our all-new <span className="text-white">v2 platform</span>.
                             </motion.p>
+
+                            <motion.ul
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.25 }}
+                                className="text-left space-y-3 mb-10 text-zinc-400"
+                            >
+                                <li className="flex items-start gap-2">
+                                    <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0" />
+                                    <span>Interactive <strong className="text-zinc-200">Chat Mode</strong> for deep exploration</span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0" />
+                                    <span>Organize with <strong className="text-zinc-200">Multiple Workspaces</strong></span>
+                                </li>
+                                <li className="flex items-start gap-2">
+                                    <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0" />
+                                    <span>App-level <strong className="text-zinc-200">MoE</strong> with multi-model routing</span>
+                                </li>
+                            </motion.ul>
 
                             <motion.div 
                                 initial={{ opacity: 0, y: 10 }}

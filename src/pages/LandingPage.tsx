@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Layers, Zap, Download, Github } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import V2FloatingButton from '../components/V2FloatingButton'
 
 export default function LandingPage() {
     return (
@@ -124,6 +125,7 @@ export default function LandingPage() {
                     </div>
                 </div>
             </footer>
+            <V2FloatingButton persistent />
         </div>
     )
 }
