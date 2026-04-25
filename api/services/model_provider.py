@@ -7,6 +7,7 @@ from google import genai
 
 from config import get_settings
 from logging_config import logger
+from token_rate_limit import TokenRateLimitExceeded, consume_tokens, estimate_tokens
 
 class ModelError(Exception):
     """Base model error."""
@@ -75,6 +76,9 @@ class ModelProvider:
         Intelligent Router for Zero-Cost Inference
         """
         
+        client_ip = kwargs.get("client_ip", "unknown")
+        await consume_tokens(client_ip, estimate_tokens(prompt))
+
         # 1. VISUAL / HEAVY CONTEXT PATH (Gemini)
         if image_data or len(prompt) > 20000:
             if not self.gemini_configured:
@@ -93,6 +97,7 @@ class ModelProvider:
                     contents=contents,
                     config={"http_options": {"timeout": 30000}},  # 30s for genai client
                 )
+                await consume_tokens(client_ip, estimate_tokens(response.text or ""))
                 return {"provider": "google", "model": model_name, "content": response.text}
             except Exception as e:
                 logger.error("gemini_heavy_failed", error=str(e))
@@ -148,7 +153,7 @@ class ModelProvider:
 
         # 5. EXECUTION
         if not self.groq_client:
-            return await self._fallback_to_gemini(prompt)
+            return await self._fallback_to_gemini(prompt, client_ip=client_ip)
 
         is_pro = kwargs.get("is_pro", False) or kwargs.get("premium", False)
         # Apply word cap for fast modes even if pro (user's request)
@@ -169,15 +174,20 @@ class ModelProvider:
             content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
             content = re.sub(r'Thought:.*?\n\n', '', content, flags=re.DOTALL) # Remove common CoT headers
             content = content.replace("<think>", "").replace("</think>", "").strip()
+            await consume_tokens(client_ip, estimate_tokens(content))
             
             return {"provider": "groq", "model": target_model, "content": content}
         
+        except TokenRateLimitExceeded:
+            raise
         except Exception as e:
             logger.warning("groq_generation_failed_fallback_to_gemini", model=target_model, error=str(e))
-            return await self._fallback_to_gemini(prompt)
+            return await self._fallback_to_gemini(prompt, client_ip=client_ip)
 
     async def route_inference_stream(self, prompt: str, **kwargs):
         """Stream inference results for real-time UI."""
+        client_ip = kwargs.get("client_ip", "unknown")
+        await consume_tokens(client_ip, estimate_tokens(prompt))
         mode = kwargs.get("mode", "").lower()
 
         if mode == "fast":
@@ -196,7 +206,7 @@ class ModelProvider:
 
         if not self.groq_client:
             # Fallback for now just returns full text as a single chunk if streaming is unavailable
-            res = await self._fallback_to_gemini(prompt)
+            res = await self._fallback_to_gemini(prompt, client_ip=client_ip)
             yield res["content"]
             return
 
@@ -236,6 +246,7 @@ class ModelProvider:
                     content = content.split("</think>")[-1]
                 
                 if not is_thinking and content:
+                    await consume_tokens(client_ip, estimate_tokens(content))
                     yield content
             
             # Log if response was truncated and signal frontend
@@ -244,12 +255,14 @@ class ModelProvider:
                 # Yield special truncation marker for frontend
                 yield "\n\n__TRUNCATED__"
 
+        except TokenRateLimitExceeded:
+            raise
         except Exception as e:
             logger.warning("groq_streaming_failed_fallback_to_gemini", error=str(e))
-            res = await self._fallback_to_gemini(prompt)
+            res = await self._fallback_to_gemini(prompt, client_ip=client_ip)
             yield res["content"]
 
-    async def _fallback_to_gemini(self, prompt: str) -> dict:
+    async def _fallback_to_gemini(self, prompt: str, client_ip: str = "unknown") -> dict:
         if not self.gemini_configured:
             raise ModelUnavailable("All providers (Groq, Gemini) failed or configured incorrectly.")
         
@@ -260,6 +273,7 @@ class ModelProvider:
                 contents=prompt,
                 config={"http_options": {"timeout": 30000}},
             )
+            await consume_tokens(client_ip, estimate_tokens(response.text or ""))
             return {
                 "provider": "google-fallback",
                 "model": model_name,
@@ -279,6 +293,8 @@ class ModelProvider:
                 contents=prompt,
                 config={"http_options": {"timeout": 30000}},
             )
+            client_ip = kwargs.get("client_ip", "unknown")
+            await consume_tokens(client_ip, estimate_tokens(response.text or ""))
             return {"provider": "google", "model": model_name, "content": response.text}
         except Exception as e:
             raise ModelError(f"Gemini generation failed: {str(e)}")

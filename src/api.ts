@@ -1,4 +1,4 @@
-import type { PinnedTopic, QueryRequest, QueryResponse, ExportRequest } from './types'
+import type { PinnedTopic, QueryRequest, QueryResponse, ExportRequest, StreamStatus } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 const IS_DEV = import.meta.env.DEV
@@ -10,6 +10,13 @@ function appendRequestId(message: string, requestId: string | null): string {
 
 function getRequestIdFromResponse(res: Response): string | null {
     return res.headers.get('x-request-id')
+}
+
+function createRequestId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID()
+    }
+    return `req-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 async function getRequestIdFromErrorBody(res: Response): Promise<string | null> {
@@ -87,10 +94,12 @@ export async function queryTopicStream(
     onChunk: (chunk: string) => void,
     onDone: (data: unknown) => void,
     onError: (err: unknown) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onStatus?: (status: StreamStatus) => void
 ) {
     const headers: HeadersInit = {
         'Content-Type': 'application/json',
+        'X-Request-ID': createRequestId(),
     }
 
     let retries = 0
@@ -98,6 +107,7 @@ export async function queryTopicStream(
 
     const fallbackToNonStream = async (reason: string): Promise<void> => {
         try {
+            onStatus?.('fallback')
             if (IS_DEV) {
                 console.warn('Streaming unavailable, falling back to non-stream response:', reason)
             }
@@ -145,8 +155,10 @@ export async function queryTopicStream(
 
             const contentType = response.headers.get('content-type')
             if (!contentType?.includes('text/event-stream')) {
+                onStatus?.('degraded')
                 return fallbackToNonStream(`Invalid content-type: ${contentType || 'unknown'}`)
             }
+            onStatus?.('live')
 
             const reader = response.body?.getReader()
             const decoder = new TextDecoder()
@@ -195,6 +207,7 @@ export async function queryTopicStream(
 
             if (err instanceof Error && err.message === 'Stream read timed out') {
                 try {
+                    onStatus?.('degraded')
                     return await fallbackToNonStream(err.message)
                 } catch {
                     // continue to retry/error flow

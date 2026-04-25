@@ -1,6 +1,7 @@
 import pytest
 
 import routers.query as query_module
+from token_rate_limit import TokenRateLimitExceeded
 
 
 @pytest.mark.asyncio
@@ -23,7 +24,7 @@ async def test_query_invalid_topic(app_client):
 
 @pytest.mark.asyncio
 async def test_query_supports_all_levels_without_premium(app_client, monkeypatch):
-    async def fake_ensemble_generate(_topic, _level, _use_premium, _mode):
+    async def fake_ensemble_generate(_topic, _level, *_args, **_kwargs):
         return "ok"
 
     monkeypatch.setattr(query_module, "ensemble_generate", fake_ensemble_generate)
@@ -72,3 +73,36 @@ async def test_query_normalizes_and_caps_levels(app_client, monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert list(data["explanations"].keys()) == ["eli5", "eli10", "eli12", "eli15"]
+
+
+@pytest.mark.asyncio
+async def test_query_returns_429_on_token_limit(app_client, monkeypatch):
+    async def fake_ensemble_generate(*_args, **_kwargs):
+        raise TokenRateLimitExceeded("limit", 60, "2026-01-01T00:00:00+00:00")
+
+    monkeypatch.setattr(query_module, "ensemble_generate", fake_ensemble_generate)
+    resp = app_client.post("/api/query", json={"topic": "Limits", "levels": ["eli5"], "mode": "fast"})
+    assert resp.status_code == 429
+    body = resp.json()
+    assert body["detail"]["error"] == "Token rate limit exceeded"
+
+
+@pytest.mark.asyncio
+async def test_query_uses_response_cache(app_client, monkeypatch):
+    calls = {"count": 0}
+
+    async def fake_ensemble_generate(*_args, **_kwargs):
+        calls["count"] += 1
+        return "cached-result"
+
+    monkeypatch.setattr(query_module, "ensemble_generate", fake_ensemble_generate)
+    payload = {"topic": "Caching", "levels": ["eli5"], "mode": "fast"}
+
+    first = app_client.post("/api/query", json=payload)
+    second = app_client.post("/api/query", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["explanations"]["eli5"] == "cached-result"
+    assert second.json()["explanations"]["eli5"] == "cached-result"
+    assert calls["count"] == 1

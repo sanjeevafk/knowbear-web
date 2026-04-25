@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 import config as config_module
 import main as main_app
+import routers.query as query_module
 import services.model_provider as model_provider_module
 
 
@@ -30,6 +31,8 @@ def test_settings():
         environment="test",
         groq_api_key="",
         gemini_api_key="",
+        token_rate_limit_enabled=True,
+        token_rate_limit_per_ip_hour=12000,
         tavily_api_key="",
         serper_api_key="",
         exa_api_key="",
@@ -55,3 +58,8 @@ def app_client(monkeypatch):
     with TestClient(main_app.app) as client:
         yield client
     main_app.app.dependency_overrides = {}
+
+
+@pytest.fixture(autouse=True)
+def clear_query_cache():
+    query_module._response_cache.clear()
