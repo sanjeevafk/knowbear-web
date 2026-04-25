@@ -13,6 +13,7 @@ async def ensemble_generate(
     use_premium: bool = False,
     mode: str = "ensemble",
     retrieval: str | None = None,
+    client_ip: str = "unknown",
 ) -> str:
     """Generate with multiple models, pick best via judge."""
     if mode == "fast":
@@ -25,13 +26,22 @@ async def ensemble_generate(
                 is_pro=use_premium,
                 mode="fast",
                 retrieval=retrieval,
+                client_ip=client_ip,
             )
         except Exception as e:
             raise RuntimeError(f"Fast model failed: {e}")
 
     models = ENSEMBLE_MODELS
     tasks = [
-        generate_explanation(topic, level, m, is_pro=use_premium, mode="ensemble", retrieval=retrieval)
+        generate_explanation(
+            topic,
+            level,
+            m,
+            is_pro=use_premium,
+            mode="ensemble",
+            retrieval=retrieval,
+            client_ip=client_ip,
+        )
         for m in models
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -41,16 +51,16 @@ async def ensemble_generate(
         raise RuntimeError(f"All models failed. Errors: {errors}")
     if len(valid) == 1:
         return valid[0][1]
-    return await judge_responses(topic, [r for _, r in valid])
+    return await judge_responses(topic, [r for _, r in valid], client_ip=client_ip)
 
 
-async def judge_responses(topic: str, responses: list[str]) -> str:
+async def judge_responses(topic: str, responses: list[str], client_ip: str = "unknown") -> str:
     """Use judge model to pick best response."""
     # Give judge more context - 1500 chars from each response
     resp_text = "\n".join(f"[{i}]: {r[:1500]}" for i, r in enumerate(responses))
     prompt = JUDGE_PROMPT.format(topic=topic, responses=resp_text)
     try:
-        result = await call_model(JUDGE_MODEL, prompt, max_tokens=256)
+        result = await call_model(JUDGE_MODEL, prompt, max_tokens=256, client_ip=client_ip)
         # Gemini can wrap JSON in markdown fences; normalize before parsing.
         cleaned = result.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         try:

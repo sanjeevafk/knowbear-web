@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Github } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Github, Pin, History, Star } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -7,6 +7,9 @@ interface SidebarProps {
     isOpen: boolean
     onToggle: () => void
     onSelectTopic: (topic: string) => void
+    historyTopics: string[]
+    favoriteTopics: string[]
+    onToggleFavorite: (topic: string) => void
 }
 
 const QUICK_TOPICS = [
@@ -17,7 +20,7 @@ const QUICK_TOPICS = [
     'Photosynthesis',
 ]
 
-export default function Sidebar({ isOpen, onToggle, onSelectTopic }: SidebarProps) {
+export default function Sidebar({ isOpen, onToggle, onSelectTopic, historyTopics, favoriteTopics, onToggleFavorite }: SidebarProps) {
     const navigate = useNavigate()
     const [isMobile, setIsMobile] = useState(false)
 
@@ -75,17 +78,65 @@ export default function Sidebar({ isOpen, onToggle, onSelectTopic }: SidebarProp
 
                 <nav className="flex-grow overflow-y-auto custom-scrollbar p-3">
                     {isOpen ? (
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1">Quick Topics</h3>
                             {QUICK_TOPICS.map((topic) => (
-                                <button
-                                    key={topic}
-                                    onClick={() => onSelectTopic(topic)}
-                                    className="w-full text-left px-3 py-2 text-sm rounded-lg text-gray-300 hover:bg-dark-800 hover:text-white transition-colors"
-                                >
-                                    {topic}
-                                </button>
+                                <div key={topic} className="group flex items-center gap-1">
+                                    <button
+                                        onClick={() => onSelectTopic(topic)}
+                                        className="flex-1 text-left px-3 py-2 text-sm rounded-lg text-gray-300 hover:bg-dark-800 hover:text-white transition-colors"
+                                    >
+                                        {topic}
+                                    </button>
+                                    <button
+                                        onClick={() => onToggleFavorite(topic)}
+                                        className="p-1.5 rounded text-gray-500 hover:text-yellow-400 hover:bg-dark-800 transition-colors"
+                                        aria-label={`Pin ${topic}`}
+                                    >
+                                        <Pin className={`w-4 h-4 ${favoriteTopics.includes(topic) ? 'text-yellow-400' : ''}`} />
+                                    </button>
+                                </div>
                             ))}
+
+                            {favoriteTopics.length > 0 && (
+                                <div className="pt-2">
+                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1 mb-2 flex items-center gap-2">
+                                        <Star className="w-3 h-3" />
+                                        Pinned
+                                    </h3>
+                                    <div className="space-y-1">
+                                        {favoriteTopics.slice(0, 6).map((topic) => (
+                                            <button
+                                                key={`fav-${topic}`}
+                                                onClick={() => onSelectTopic(topic)}
+                                                className="w-full text-left px-3 py-2 text-sm rounded-lg text-yellow-200 hover:bg-dark-800 hover:text-yellow-100 transition-colors"
+                                            >
+                                                {topic}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {historyTopics.length > 0 && (
+                                <div className="pt-2">
+                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest px-1 mb-2 flex items-center gap-2">
+                                        <History className="w-3 h-3" />
+                                        Recent
+                                    </h3>
+                                    <div className="space-y-1">
+                                        {historyTopics.slice(0, 8).map((topic) => (
+                                            <button
+                                                key={`hist-${topic}`}
+                                                onClick={() => onSelectTopic(topic)}
+                                                className="w-full text-left px-3 py-2 text-sm rounded-lg text-gray-300 hover:bg-dark-800 hover:text-white transition-colors"
+                                            >
+                                                {topic}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : null}
                 </nav>

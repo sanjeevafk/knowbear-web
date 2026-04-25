@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     kaggle_api_token: str = ""
     gemini_api_key: str = ""
+    token_rate_limit_enabled: bool = True
+    token_rate_limit_per_ip_hour: int = 12000
     tavily_api_key: str = ""
     serper_api_key: str = ""
     exa_api_key: str = ""

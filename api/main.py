@@ -16,6 +16,7 @@ from logging_config import logger, setup_logging
 from routers import export, pinned, query
 from services.inference import close_client
 from services.model_provider import ModelError, ModelProvider, ModelUnavailable
+from token_rate_limit import TokenRateLimitExceeded
 
 
 @asynccontextmanager
@@ -128,6 +129,24 @@ async def model_error_handler(request: Request, exc: ModelError):
     return JSONResponse(
         status_code=400,
         content={"error": "Bad Request", "detail": str(exc), "request_id": request_id},
+    )
+
+
+@app.exception_handler(TokenRateLimitExceeded)
+async def token_rate_limit_handler(request: Request, exc: TokenRateLimitExceeded):
+    logger.warning("token_rate_limit_exceeded", error=str(exc))
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": "Token rate limit exceeded",
+            "detail": {
+                "message": exc.message,
+                "retry_after_seconds": exc.retry_after_seconds,
+                "retry_at_utc": exc.retry_at_utc,
+            },
+            "request_id": request_id,
+        },
     )
 
 

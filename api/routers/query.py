@@ -2,8 +2,9 @@
 
 import asyncio
 import json
+import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -13,12 +14,15 @@ from typing import cast
 from logging_config import logger
 from services.ensemble import ensemble_generate
 from services.inference import generate_stream_explanation
+from token_rate_limit import TokenRateLimitExceeded
 from utils import FREE_LEVELS, PREMIUM_LEVELS, sanitize_topic
 
 router = APIRouter(tags=["query"])
 
 ALL_LEVELS = FREE_LEVELS + PREMIUM_LEVELS
 MAX_LEVELS_PER_QUERY = 4
+RESPONSE_CACHE_TTL_SECONDS = 300
+_response_cache: dict[str, tuple[float, str]] = {}
 
 
 class QueryRequest(BaseModel):
@@ -52,6 +56,34 @@ def _normalize_levels(levels: list[str]) -> list[str]:
     return normalized
 
 
+def _get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _cache_key(topic: str, level: str, mode: str, retrieval: str | None) -> str:
+    return f"{topic.lower()}::{level}::{mode}::{retrieval or 'auto'}"
+
+
+def _cache_get(key: str) -> str | None:
+    hit = _response_cache.get(key)
+    if not hit:
+        return None
+    expires_at, value = hit
+    if expires_at <= time.time():
+        _response_cache.pop(key, None)
+        return None
+    return value
+
+
+def _cache_set(key: str, value: str) -> None:
+    _response_cache[key] = (time.time() + RESPONSE_CACHE_TTL_SECONDS, value)
+
+
 async def _stream_chunks(stream: AsyncIterator[str] | Iterator[str]):
     if isinstance(stream, AsyncIterator):
         async for chunk in stream:
@@ -64,9 +96,10 @@ async def _stream_chunks(stream: AsyncIterator[str] | Iterator[str]):
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query_topic(req: QueryRequest) -> QueryResponse:
+async def query_topic(req: QueryRequest, request: Request) -> QueryResponse:
     """Generate explanations for a topic."""
     req.mode = _normalize_mode(req.mode)
+    client_ip = _get_client_ip(request)
 
     try:
         topic = sanitize_topic(req.topic)
@@ -81,12 +114,34 @@ async def query_topic(req: QueryRequest) -> QueryResponse:
 
     explanations: dict[str, str] = {}
     logger.info("query_start_generation", topic=topic, levels=levels, mode=req.mode)
-    tasks = {level: ensemble_generate(topic, level, False, req.mode, req.retrieval) for level in levels}
-    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+    tasks: dict[str, asyncio.Task[str]] = {}
+    for level in levels:
+        key = _cache_key(topic, level, req.mode, req.retrieval)
+        if not req.regenerate:
+            cached = _cache_get(key)
+            if cached:
+                explanations[level] = cached
+                continue
+        tasks[level] = asyncio.create_task(
+            ensemble_generate(topic, level, False, req.mode, req.retrieval, client_ip=client_ip)
+        )
 
+    results = await asyncio.gather(*tasks.values(), return_exceptions=True) if tasks else []
     for level, result in zip(tasks.keys(), results):
         if isinstance(result, str):
             explanations[level] = result
+            if not req.regenerate:
+                _cache_set(_cache_key(topic, level, req.mode, req.retrieval), result)
+        elif isinstance(result, TokenRateLimitExceeded):
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "Token rate limit exceeded",
+                    "message": result.message,
+                    "retry_after_seconds": result.retry_after_seconds,
+                    "retry_at_utc": result.retry_at_utc,
+                },
+            ) from result
         else:
             error_msg = str(result) if result else "Unknown error"
             explanations[level] = f"Error generating {level}: {error_msg}"
@@ -96,9 +151,10 @@ async def query_topic(req: QueryRequest) -> QueryResponse:
 
 
 @router.post("/query/stream")
-async def query_topic_stream(req: QueryRequest):
+async def query_topic_stream(req: QueryRequest, request: Request):
     """Stream explanations for a topic."""
     req.mode = _normalize_mode(req.mode)
+    client_ip = _get_client_ip(request)
 
     try:
         topic = sanitize_topic(req.topic)
@@ -106,6 +162,16 @@ async def query_topic_stream(req: QueryRequest):
         raise HTTPException(400, str(e)) from e
 
     level = req.levels[0] if req.levels and req.levels[0] in ALL_LEVELS else "eli5"
+    cache_key = _cache_key(topic, level, req.mode, req.retrieval)
+    if not req.regenerate:
+        cached = _cache_get(cache_key)
+        if cached:
+            async def cached_event_generator():
+                yield f"data: {json.dumps({'topic': topic, 'level': level})}\n\n"
+                yield f"data: {json.dumps({'chunk': cached})}\n\n"
+                yield "data: [DONE]\n\n"
+
+            return StreamingResponse(cached_event_generator(), media_type="text/event-stream")
 
     async def event_generator():
         full_content = ""
@@ -127,6 +193,7 @@ async def query_topic_stream(req: QueryRequest):
                 is_pro=False,
                 temperature=req.temperature,
                 regenerate=req.regenerate,
+                client_ip=client_ip,
             )
             async for chunk in _stream_chunks(stream):
                 full_content += chunk
@@ -171,8 +238,13 @@ async def query_topic_stream(req: QueryRequest):
             if buffer:
                 yield f"data: {json.dumps({'chunk': buffer})}\n\n"
 
+            if full_content and not req.regenerate:
+                _cache_set(cache_key, full_content)
             yield "data: [DONE]\n\n"
 
+        except TokenRateLimitExceeded as e:
+            logger.warning("streaming_token_rate_limited", error=str(e), topic=topic)
+            yield f"data: {json.dumps({'error': e.message})}\n\n"
         except Exception as e:
             logger.error("streaming_failed", error=str(e), topic=topic)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"

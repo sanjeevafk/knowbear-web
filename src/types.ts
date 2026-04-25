@@ -14,6 +14,7 @@ export interface QueryRequest {
 }
 
 export type Mode = 'fast' | 'ensemble'
+export type StreamStatus = 'idle' | 'live' | 'fallback' | 'degraded'
 
 export interface QueryResponse {
     topic: string
