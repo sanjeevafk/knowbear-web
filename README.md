@@ -14,7 +14,6 @@ Both modes use the same retrieval entry point and enrich prompts with live web c
 - `ensemble` mode: multi-model generation with judge selection
 - Streaming responses over SSE
 - Export as `.txt` or `.md`
-- Rate limiting: **5 requests/hour per IP**
 
 ## Architecture (High Level)
 

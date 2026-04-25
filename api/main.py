@@ -6,13 +6,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 import structlog
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from config import get_settings
 from logging_config import logger, setup_logging
-from rate_limit import enforce_ip_rate_limit
 from routers import export, pinned, query
 from services.inference import close_client
 from services.model_provider import ModelError, ModelProvider, ModelUnavailable
@@ -118,7 +117,7 @@ async def model_error_handler(request: Request, exc: ModelError):
 
 
 app.include_router(pinned.router, prefix="/api")
-app.include_router(query.router, prefix="/api", dependencies=[Depends(enforce_ip_rate_limit)])
+app.include_router(query.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 
 
