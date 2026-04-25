@@ -20,7 +20,7 @@ async function fetchAPI<T>(path: string, options?: RequestInit & { responseType?
         clearTimeout(timeoutId)
 
         if (res.status === 429) {
-            let detail = 'Demo limit reached: 5 requests per hour per IP. Please try again later.'
+            let detail = 'Too many requests. Please try again later.'
             try {
                 const body = await res.json()
                 const message = body?.detail?.message || body?.detail
@@ -97,7 +97,7 @@ export async function queryTopicStream(
             })
 
             if (response.status === 429) {
-                let detail = 'Demo limit reached: 5 requests per hour per IP. Please try again later.'
+                let detail = 'Too many requests. Please try again later.'
                 try {
                     const body = await response.json()
                     const message = body?.detail?.message || body?.detail
