@@ -4,6 +4,7 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
+from uuid import uuid4
 
 import structlog
 from fastapi import FastAPI, Request
@@ -43,7 +44,7 @@ app.add_middleware(
     allow_origins=[origin.strip() for origin in allowed_origins],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS", "DELETE"],
-    allow_headers=["content-type"],
+    allow_headers=["content-type", "x-request-id"],
     max_age=3600,
 )
 
@@ -78,15 +79,20 @@ async def security_headers(request: Request, call_next):
 
 @app.middleware("http")
 async def structlog_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid4())
+    request.state.request_id = request_id
+
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(
         path=request.url.path,
         method=request.method,
         client_ip=request.client.host if request.client else None,
+        request_id=request_id,
     )
 
     try:
         response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
         structlog.contextvars.bind_contextvars(status_code=response.status_code)
         if response.status_code >= 400:
             logger.warning("http_request_failed")
@@ -101,19 +107,28 @@ async def structlog_middleware(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error("global_exception", error=str(exc))
-    return JSONResponse(status_code=500, content={"error": "Internal server error"})
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(status_code=500, content={"error": "Internal server error", "request_id": request_id})
 
 
 @app.exception_handler(ModelUnavailable)
 async def model_unavailable_handler(request: Request, exc: ModelUnavailable):
     logger.warning("model_unavailable", error=str(exc))
-    return JSONResponse(status_code=503, content={"error": "Service Unavailable", "detail": str(exc)})
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(
+        status_code=503,
+        content={"error": "Service Unavailable", "detail": str(exc), "request_id": request_id},
+    )
 
 
 @app.exception_handler(ModelError)
 async def model_error_handler(request: Request, exc: ModelError):
     logger.error("model_error", error=str(exc))
-    return JSONResponse(status_code=400, content={"error": "Bad Request", "detail": str(exc)})
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(
+        status_code=400,
+        content={"error": "Bad Request", "detail": str(exc), "request_id": request_id},
+    )
 
 
 app.include_router(pinned.router, prefix="/api")

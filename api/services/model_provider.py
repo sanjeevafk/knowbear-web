@@ -1,9 +1,12 @@
 """Model provider abstraction."""
 
 import re
+
 from groq import AsyncGroq
 from google import genai
+
 from config import get_settings
+from logging_config import logger
 
 class ModelError(Exception):
     """Base model error."""
@@ -30,17 +33,17 @@ class ModelProvider:
         
 
         if self.settings.gemini_api_key:
-             try:
+            try:
                 self.gemini_client = genai.Client(api_key=self.settings.gemini_api_key)
                 self.gemini_configured = True
-             except Exception as e:
-                print(f"Gemini init failed: {e}")
+            except Exception as e:
+                logger.error("gemini_init_failed", error=str(e))
 
         if self.settings.groq_api_key:
             try:
                 self.groq_client = AsyncGroq(api_key=self.settings.groq_api_key)
             except Exception as e:
-                print(f"Groq init failed: {e}")
+                logger.error("groq_init_failed", error=str(e))
         
 
     @classmethod
@@ -75,7 +78,7 @@ class ModelProvider:
         # 1. VISUAL / HEAVY CONTEXT PATH (Gemini)
         if image_data or len(prompt) > 20000:
             if not self.gemini_configured:
-                 raise ModelUnavailable("Gemini is not configured for heavy/visual tasks.")
+                raise ModelUnavailable("Gemini is not configured for heavy/visual tasks.")
             
             model_name = "gemini-2.0-flash"
 
@@ -88,12 +91,12 @@ class ModelProvider:
                 response = await self.gemini_client.aio.models.generate_content(
                     model=model_name,
                     contents=contents,
-                    config={"http_options": {"timeout": 30000}} # 30s for genai client
+                    config={"http_options": {"timeout": 30000}},  # 30s for genai client
                 )
                 return {"provider": "google", "model": model_name, "content": response.text}
             except Exception as e:
-                 print(f"Gemini Heavy Failed: {e}")
-                 raise ModelError(f"Gemini generation failed: {e}")
+                logger.error("gemini_heavy_failed", error=str(e))
+                raise ModelError(f"Gemini generation failed: {e}")
 
         # 2. INTELLIGENT ROUTING (Groq)
         target_model = "llama-3.1-8b-instant" # Default for speed/simple tasks
@@ -145,12 +148,12 @@ class ModelProvider:
 
         # 5. EXECUTION
         if not self.groq_client:
-             return await self._fallback_to_gemini(prompt)
+            return await self._fallback_to_gemini(prompt)
 
         is_pro = kwargs.get("is_pro", False) or kwargs.get("premium", False)
         # Apply word cap for fast modes even if pro (user's request)
         if mode == "fast":
-             max_tokens = 1200  # Increased from 400 to prevent truncation
+            max_tokens = 1200  # Increased from 400 to prevent truncation
 
         try:
             completion = await self.groq_client.chat.completions.create(
@@ -170,7 +173,7 @@ class ModelProvider:
             return {"provider": "groq", "model": target_model, "content": content}
         
         except Exception as e:
-            print(f"Groq Error ({target_model}): {e}. Initiating Gemini fallback.")
+            logger.warning("groq_generation_failed_fallback_to_gemini", model=target_model, error=str(e))
             return await self._fallback_to_gemini(prompt)
 
     async def route_inference_stream(self, prompt: str, **kwargs):
@@ -178,9 +181,9 @@ class ModelProvider:
         mode = kwargs.get("mode", "").lower()
 
         if mode == "fast":
-             # Fast mode uses llama models only
-             target_model = "llama-3.1-8b-instant"
-             max_tokens = 1200  # Increased from 400 to prevent truncation
+            # Fast mode uses llama models only
+            target_model = "llama-3.1-8b-instant"
+            max_tokens = 1200  # Increased from 400 to prevent truncation
         elif mode == "ensemble":
             target_model = "llama-3.3-70b-versatile"
             max_tokens = 1600
@@ -237,12 +240,12 @@ class ModelProvider:
             
             # Log if response was truncated and signal frontend
             if finish_reason == 'length':
-                print(f"WARNING: Response truncated due to max_tokens limit. Mode: {mode}, Model: {target_model}")
+                logger.warning("stream_truncated", mode=mode, model=target_model)
                 # Yield special truncation marker for frontend
                 yield "\n\n__TRUNCATED__"
-        
+
         except Exception as e:
-            print(f"Groq Streaming Error: {e}")
+            logger.warning("groq_streaming_failed_fallback_to_gemini", error=str(e))
             res = await self._fallback_to_gemini(prompt)
             yield res["content"]
 
@@ -255,15 +258,15 @@ class ModelProvider:
             response = await self.gemini_client.aio.models.generate_content(
                 model=model_name,
                 contents=prompt,
-                config={"http_options": {"timeout": 30000}}
+                config={"http_options": {"timeout": 30000}},
             )
             return {
-                "provider": "google-fallback", 
+                "provider": "google-fallback",
                 "model": model_name,
-                "content": response.text
+                "content": response.text,
             }
         except Exception as e:
-             raise ModelError(f"Critical: Fallback Gemini generation failed: {str(e)}")
+            raise ModelError(f"Critical: Fallback Gemini generation failed: {str(e)}")
 
     async def _call_gemini_direct(self, prompt: str, model_name: str = "gemini-2.0-flash", **kwargs) -> dict:
         """Legacy direct call."""
@@ -274,7 +277,7 @@ class ModelProvider:
             response = await self.gemini_client.aio.models.generate_content(
                 model=model_name,
                 contents=prompt,
-                config={"http_options": {"timeout": 30000}}
+                config={"http_options": {"timeout": 30000}},
             )
             return {"provider": "google", "model": model_name, "content": response.text}
         except Exception as e:

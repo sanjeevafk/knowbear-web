@@ -52,3 +52,23 @@ async def test_query_stream_emits_done(app_client, monkeypatch):
     text = resp.text
     assert "data: [DONE]" in text
     assert "chunk" in text
+
+
+@pytest.mark.asyncio
+async def test_query_normalizes_and_caps_levels(app_client, monkeypatch):
+    async def fake_ensemble_generate(_topic, level, *_args, **_kwargs):
+        return f"{level}-ok"
+
+    monkeypatch.setattr(query_module, "ensemble_generate", fake_ensemble_generate)
+
+    resp = app_client.post(
+        "/api/query",
+        json={
+            "topic": "Physics",
+            "levels": ["eli5", "eli5", "eli10", "eli12", "eli15", "meme", "classic60"],
+            "mode": "fast",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert list(data["explanations"].keys()) == ["eli5", "eli10", "eli12", "eli15"]

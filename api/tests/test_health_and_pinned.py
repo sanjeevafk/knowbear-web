@@ -9,6 +9,7 @@ async def test_health_ok(app_client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
+    assert "x-request-id" in resp.headers
 
 
 @pytest.mark.asyncio
@@ -28,3 +29,10 @@ async def test_pinned_topics():
     topics = await pinned_module.get_pinned()
     assert topics
     assert topics[0]["id"]
+
+
+@pytest.mark.asyncio
+async def test_request_id_is_echoed_when_provided(app_client):
+    resp = app_client.get("/api/health", headers={"x-request-id": "kb-test-id"})
+    assert resp.status_code == 200
+    assert resp.headers.get("x-request-id") == "kb-test-id"

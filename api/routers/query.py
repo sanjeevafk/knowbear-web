@@ -18,6 +18,7 @@ from utils import FREE_LEVELS, PREMIUM_LEVELS, sanitize_topic
 router = APIRouter(tags=["query"])
 
 ALL_LEVELS = FREE_LEVELS + PREMIUM_LEVELS
+MAX_LEVELS_PER_QUERY = 4
 
 
 class QueryRequest(BaseModel):
@@ -36,6 +37,19 @@ class QueryResponse(BaseModel):
 
 def _normalize_mode(mode: str) -> str:
     return mode if mode in {"fast", "ensemble"} else "fast"
+
+
+def _normalize_levels(levels: list[str]) -> list[str]:
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for level in levels:
+        if level not in ALL_LEVELS or level in seen:
+            continue
+        seen.add(level)
+        normalized.append(level)
+        if len(normalized) >= MAX_LEVELS_PER_QUERY:
+            break
+    return normalized
 
 
 async def _stream_chunks(stream: AsyncIterator[str] | Iterator[str]):
@@ -59,9 +73,11 @@ async def query_topic(req: QueryRequest) -> QueryResponse:
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
-    levels = [level for level in req.levels if level in ALL_LEVELS]
+    levels = _normalize_levels(req.levels)
     if not levels:
         levels = ["eli5"]
+    if len(req.levels) > len(levels):
+        logger.info("query_levels_normalized", requested=req.levels, normalized=levels)
 
     explanations: dict[str, str] = {}
     logger.info("query_start_generation", topic=topic, levels=levels, mode=req.mode)
