@@ -1,14 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useKnowBearStore } from './useKnowBearStore'
+import { queryTopicStream } from '../api'
 
 vi.mock('../api', () => ({
-    queryTopicStream: vi.fn((_req, onChunk, onDone) => {
-        setTimeout(() => {
-            onChunk('Test content')
-            onDone({})
-        }, 20)
-        return Promise.resolve()
+    queryTopicStream: vi.fn((req, onChunk, onDone, _onError, signal?: AbortSignal) => {
+        return new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                onChunk(`${req.topic} content`)
+                onDone({})
+                resolve()
+            }, 20)
+
+            signal?.addEventListener('abort', () => {
+                clearTimeout(timeout)
+                reject(new DOMException('The operation was aborted.', 'AbortError'))
+            })
+        })
     }),
 }))
 
@@ -35,7 +43,26 @@ describe('useKnowBearStore', () => {
         })
 
         await waitFor(() => {
-            expect(result.current.result?.explanations.eli5).toBe('Test content')
+            expect(result.current.result?.explanations.eli5).toBe('blockchain content')
         })
+    })
+
+    it('aborts an active stream when a new search starts', async () => {
+        const streamMock = vi.mocked(queryTopicStream)
+        const { result } = renderHook(() => useKnowBearStore())
+
+        await act(async () => {
+            const firstSearch = result.current.startSearch('first topic')
+            await result.current.startSearch('second topic')
+            await firstSearch
+        })
+
+        await waitFor(() => {
+            expect(result.current.activeTopic).toBe('second topic')
+            expect(result.current.result?.topic).toBe('second topic')
+            expect(result.current.result?.explanations.eli5).toBe('second topic content')
+        })
+
+        expect(streamMock).toHaveBeenCalledTimes(2)
     })
 })

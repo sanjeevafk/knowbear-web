@@ -1,6 +1,25 @@
 import type { PinnedTopic, QueryRequest, QueryResponse, ExportRequest } from './types'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
+const IS_DEV = import.meta.env.DEV
+
+function appendRequestId(message: string, requestId: string | null): string {
+    if (!requestId) return message
+    return `${message} (request id: ${requestId})`
+}
+
+function getRequestIdFromResponse(res: Response): string | null {
+    return res.headers.get('x-request-id')
+}
+
+async function getRequestIdFromErrorBody(res: Response): Promise<string | null> {
+    try {
+        const body = await res.clone().json()
+        return body?.request_id ?? null
+    } catch {
+        return null
+    }
+}
 
 async function fetchAPI<T>(path: string, options?: RequestInit & { responseType?: 'json' | 'blob' }): Promise<T> {
     const headers: HeadersInit = {
@@ -25,13 +44,19 @@ async function fetchAPI<T>(path: string, options?: RequestInit & { responseType?
                 const body = await res.json()
                 const message = body?.detail?.message || body?.detail
                 if (typeof message === 'string') detail = message
+                const bodyRequestId = typeof body?.request_id === 'string' ? body.request_id : null
+                detail = appendRequestId(detail, bodyRequestId || getRequestIdFromResponse(res))
             } catch {
                 // ignore parse error and keep default message
+                detail = appendRequestId(detail, getRequestIdFromResponse(res))
             }
             throw new Error(detail)
         }
 
-        if (!res.ok) throw new Error(`API error: ${res.status}`)
+        if (!res.ok) {
+            const requestId = getRequestIdFromResponse(res) || await getRequestIdFromErrorBody(res)
+            throw new Error(appendRequestId(`API error: ${res.status}`, requestId))
+        }
 
         if (options?.responseType === 'blob') {
             return await res.blob() as unknown as T
@@ -73,7 +98,9 @@ export async function queryTopicStream(
 
     const fallbackToNonStream = async (reason: string): Promise<void> => {
         try {
-            console.warn('Streaming unavailable, falling back to non-stream response:', reason)
+            if (IS_DEV) {
+                console.warn('Streaming unavailable, falling back to non-stream response:', reason)
+            }
             const data = await queryTopic(req)
             const preferredLevel = req.levels?.[0]
             const levelKey = preferredLevel && data.explanations?.[preferredLevel]
@@ -102,13 +129,19 @@ export async function queryTopicStream(
                     const body = await response.json()
                     const message = body?.detail?.message || body?.detail
                     if (typeof message === 'string') detail = message
+                    const bodyRequestId = typeof body?.request_id === 'string' ? body.request_id : null
+                    detail = appendRequestId(detail, bodyRequestId || getRequestIdFromResponse(response))
                 } catch {
                     // ignore
+                    detail = appendRequestId(detail, getRequestIdFromResponse(response))
                 }
                 throw new Error(detail)
             }
 
-            if (!response.ok) throw new Error(`API error: ${response.status}`)
+            if (!response.ok) {
+                const requestId = getRequestIdFromResponse(response) || await getRequestIdFromErrorBody(response)
+                throw new Error(appendRequestId(`API error: ${response.status}`, requestId))
+            }
 
             const contentType = response.headers.get('content-type')
             if (!contentType?.includes('text/event-stream')) {
@@ -151,7 +184,9 @@ export async function queryTopicStream(
                             return
                         }
                     } catch (e) {
-                        console.warn('Failed to parse SSE chunk:', data.substring(0, 100), e)
+                        if (IS_DEV) {
+                            console.warn('Failed to parse SSE chunk:', data.substring(0, 100), e)
+                        }
                     }
                 }
             }
