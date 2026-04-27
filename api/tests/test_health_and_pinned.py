@@ -36,3 +36,13 @@ async def test_request_id_is_echoed_when_provided(app_client):
     resp = app_client.get("/api/health", headers={"x-request-id": "kb-test-id"})
     assert resp.status_code == 200
     assert resp.headers.get("x-request-id") == "kb-test-id"
+
+
+@pytest.mark.asyncio
+async def test_keep_alive_returns_200_with_probe_payload(app_client):
+    resp = app_client.get("/api/keep-alive")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "alive"
+    assert "probes" in data
+    assert "upstash_redis" in data["probes"]
