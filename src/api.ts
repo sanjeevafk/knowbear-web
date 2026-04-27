@@ -1,4 +1,11 @@
 import type { PinnedTopic, QueryRequest, QueryResponse, StreamStatus } from './types'
+import { ZodError } from 'zod'
+import {
+    pinnedTopicsSchema,
+    queryRequestSchema,
+    queryResponseSchema,
+    streamChunkSchema,
+} from './schemas'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 const IS_DEV = import.meta.env.DEV
@@ -78,15 +85,29 @@ async function fetchAPI<T>(path: string, options?: RequestInit & { responseType?
     }
 }
 
+function formatValidationError(prefix: string, err: ZodError): Error {
+    const details = err.issues.map((issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`).join('; ')
+    return new Error(`${prefix} (${details})`)
+}
+
 export async function getPinnedTopics(): Promise<PinnedTopic[]> {
-    return fetchAPI('/api/pinned')
+    const data = await fetchAPI<unknown>('/api/pinned')
+    const parsed = pinnedTopicsSchema.safeParse(data)
+    if (!parsed.success) throw formatValidationError('Invalid pinned topics response', parsed.error)
+    return parsed.data
 }
 
 export async function queryTopic(req: QueryRequest): Promise<QueryResponse> {
-    return fetchAPI('/api/query', {
+    const request = queryRequestSchema.safeParse(req)
+    if (!request.success) throw formatValidationError('Invalid query request', request.error)
+
+    const data = await fetchAPI<unknown>('/api/query', {
         method: 'POST',
-        body: JSON.stringify(req),
+        body: JSON.stringify(request.data),
     })
+    const parsed = queryResponseSchema.safeParse(data)
+    if (!parsed.success) throw formatValidationError('Invalid query response', parsed.error)
+    return parsed.data
 }
 
 export async function queryTopicStream(
@@ -97,6 +118,9 @@ export async function queryTopicStream(
     signal?: AbortSignal,
     onStatus?: (status: StreamStatus) => void
 ) {
+    const request = queryRequestSchema.safeParse(req)
+    if (!request.success) throw formatValidationError('Invalid stream request', request.error)
+
     const headers: HeadersInit = {
         'Content-Type': 'application/json',
         'X-Request-ID': createRequestId(),
@@ -111,8 +135,8 @@ export async function queryTopicStream(
             if (IS_DEV) {
                 console.warn('Streaming unavailable, falling back to non-stream response:', reason)
             }
-            const data = await queryTopic(req)
-            const preferredLevel = req.levels?.[0]
+            const data = await queryTopic(request.data)
+            const preferredLevel = request.data.levels?.[0]
             const levelKey = preferredLevel && data.explanations?.[preferredLevel]
                 ? preferredLevel
                 : Object.keys(data.explanations || {})[0]
@@ -129,7 +153,7 @@ export async function queryTopicStream(
             const response = await fetch(`${API_URL}/api/query/stream`, {
                 method: 'POST',
                 headers,
-                body: JSON.stringify(req),
+                body: JSON.stringify(request.data),
                 signal,
             })
 
@@ -188,11 +212,17 @@ export async function queryTopicStream(
                         return
                     }
                     try {
-                        const parsed = JSON.parse(data)
-                        if (parsed.chunk) onChunk(parsed.chunk)
-                        else if (parsed.warning) onChunk(`\n\n${parsed.warning}`)
-                        else if (parsed.error) {
-                            onError(new Error(parsed.error))
+                        const raw = JSON.parse(data)
+                        const parsed = streamChunkSchema.safeParse(raw)
+                        if (!parsed.success) {
+                            if (IS_DEV) console.warn('Invalid SSE payload shape:', raw)
+                            continue
+                        }
+
+                        if (parsed.data.chunk) onChunk(parsed.data.chunk)
+                        else if (parsed.data.warning) onChunk(`\n\n${parsed.data.warning}`)
+                        else if (parsed.data.error) {
+                            onError(new Error(parsed.data.error))
                             return
                         }
                     } catch (e) {

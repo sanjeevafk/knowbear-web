@@ -1,30 +1,10 @@
 import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { QueryResponse, Mode, Level, PinnedTopic, StreamStatus } from '../types'
 import { queryTopicStream } from '../api'
 
-const FAVORITES_KEY = 'knowbear-favorite-topics'
 const MAX_TOPIC_HISTORY = 12
-
-function loadStringArray(key: string): string[] {
-    if (typeof window === 'undefined') return []
-    try {
-        const raw = window.localStorage.getItem(key)
-        if (!raw) return []
-        const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : []
-    } catch {
-        return []
-    }
-}
-
-function saveStringArray(key: string, values: string[]): void {
-    if (typeof window === 'undefined') return
-    try {
-        window.localStorage.setItem(key, JSON.stringify(values))
-    } catch {
-        // no-op
-    }
-}
+const STORE_KEY = 'knowbear-store'
 
 interface KnowBearState {
     loading: boolean
@@ -87,197 +67,220 @@ const initialState = {
     lastFailedRequest: null,
 }
 
-export const useKnowBearStore = create<KnowBearState>()((set, get) => ({
-    ...initialState,
-    favoriteTopics: loadStringArray(FAVORITES_KEY),
+export const useKnowBearStore = create<KnowBearState>()(
+    persist(
+        (set, get) => ({
+            ...initialState,
 
-    setLoading: (loading) => set({ loading }),
-    setResult: (result) => set({ result }),
-    setSelectedLevel: (selectedLevel) => set({ selectedLevel }),
-    setError: (error) => set({ error }),
-    setMode: (mode) => set({ mode }),
-    setFetchingLevels: (fetchingLevels) => set({ fetchingLevels }),
-    setFailedLevels: (failedLevels) => set({ failedLevels }),
-    setIsSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
-    setActiveTopic: (activeTopic) => set({ activeTopic }),
-    setLoadingMeta: (loadingMeta) => set({ loadingMeta }),
-    setModeSwitching: (modeSwitching) => set({ modeSwitching }),
-    setStreamStatus: (streamStatus) => set({ streamStatus }),
-    toggleFavoriteTopic: (topic) => {
-        const cleanTopic = topic.trim()
-        if (!cleanTopic) return
-        const current = get().favoriteTopics
-        const exists = current.some((item) => item.toLowerCase() === cleanTopic.toLowerCase())
-        const next = exists
-            ? current.filter((item) => item.toLowerCase() !== cleanTopic.toLowerCase())
-            : [cleanTopic, ...current].slice(0, MAX_TOPIC_HISTORY)
-        saveStringArray(FAVORITES_KEY, next)
-        set({ favoriteTopics: next })
-    },
+            setLoading: (loading) => set({ loading }),
+            setResult: (result) => set({ result }),
+            setSelectedLevel: (selectedLevel) => set({ selectedLevel }),
+            setError: (error) => set({ error }),
+            setMode: (mode) => set({ mode }),
+            setFetchingLevels: (fetchingLevels) => set({ fetchingLevels }),
+            setFailedLevels: (failedLevels) => set({ failedLevels }),
+            setIsSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
+            setActiveTopic: (activeTopic) => set({ activeTopic }),
+            setLoadingMeta: (loadingMeta) => set({ loadingMeta }),
+            setModeSwitching: (modeSwitching) => set({ modeSwitching }),
+            setStreamStatus: (streamStatus) => set({ streamStatus }),
+            toggleFavoriteTopic: (topic) => {
+                const cleanTopic = topic.trim()
+                if (!cleanTopic) return
+                const current = get().favoriteTopics
+                const exists = current.some((item) => item.toLowerCase() === cleanTopic.toLowerCase())
+                const next = exists
+                    ? current.filter((item) => item.toLowerCase() !== cleanTopic.toLowerCase())
+                    : [cleanTopic, ...current].slice(0, MAX_TOPIC_HISTORY)
+                set({ favoriteTopics: next })
+            },
 
-    abortCurrentStream: () => {
-        const { abortController } = get()
-        if (abortController) abortController.abort()
-        const newController = new AbortController()
-        set({ abortController: newController })
-    },
+            abortCurrentStream: () => {
+                const { abortController } = get()
+                if (abortController) abortController.abort()
+                const newController = new AbortController()
+                set({ abortController: newController })
+            },
 
-    fetchPinnedTopics: async () => {
-        if (get().pinnedTopicsLoaded) return
-        try {
-            const { getPinnedTopics } = await import('../api')
-            const topics = await getPinnedTopics()
-            set({ pinnedTopics: topics, pinnedTopicsLoaded: true })
-        } catch (err) {
-            console.error('Failed to load pinned topics:', err)
-            // Even if it fails, maybe we mark it loaded to avoid infinite retries, or leave it false
-            set({ pinnedTopicsLoaded: true })
-        }
-    },
+            fetchPinnedTopics: async () => {
+                if (get().pinnedTopicsLoaded) return
+                try {
+                    const { getPinnedTopics } = await import('../api')
+                    const topics = await getPinnedTopics()
+                    set({ pinnedTopics: topics, pinnedTopicsLoaded: true })
+                } catch (err) {
+                    console.error('Failed to load pinned topics:', err)
+                    set({ pinnedTopicsLoaded: true })
+                }
+            },
 
-    fetchLevel: async (topic: string, level: Level, mode: Mode, options?: { temperature?: number; regenerate?: boolean }) => {
-        const state = get()
-        const newFetching = new Set(state.fetchingLevels)
-        newFetching.add(level)
-        set({ fetchingLevels: newFetching })
+            fetchLevel: async (topic: string, level: Level, mode: Mode, options?: { temperature?: number; regenerate?: boolean }) => {
+                const state = get()
+                const newFetching = new Set(state.fetchingLevels)
+                newFetching.add(level)
+                set({ fetchingLevels: newFetching })
 
-        const controller = state.abortController || new AbortController()
-        if (!state.abortController) set({ abortController: controller })
+                const controller = state.abortController || new AbortController()
+                if (!state.abortController) set({ abortController: controller })
 
-        try {
-            let streamedText = ''
-            set({ streamStatus: 'idle' })
+                try {
+                    let streamedText = ''
+                    set({ streamStatus: 'idle' })
 
-            await queryTopicStream(
-                {
-                    topic,
-                    levels: [level],
-                    mode,
-                    temperature: options?.temperature,
-                    regenerate: options?.regenerate || false,
-                },
-                (chunk: string) => {
-                    streamedText += chunk
-                    const currentState = get()
-                    if (!currentState.result) {
-                        controller.abort()
-                        return
+                    await queryTopicStream(
+                        {
+                            topic,
+                            levels: [level],
+                            mode,
+                            temperature: options?.temperature,
+                            regenerate: options?.regenerate || false,
+                        },
+                        (chunk: string) => {
+                            streamedText += chunk
+                            const currentState = get()
+                            if (!currentState.result) {
+                                controller.abort()
+                                return
+                            }
+
+                            set({
+                                result: {
+                                    ...currentState.result,
+                                    explanations: {
+                                        ...currentState.result.explanations,
+                                        [level]: streamedText,
+                                    },
+                                },
+                            })
+                        },
+                        () => undefined,
+                        (error: unknown) => {
+                            const failed = new Set(get().failedLevels)
+                            failed.add(level)
+                            const message = error instanceof Error ? error.message : 'Request failed'
+                            set({
+                                failedLevels: failed,
+                                error: message,
+                                streamStatus: 'degraded',
+                                lastFailedRequest: { topic, mode, level },
+                            })
+                        },
+                        controller.signal,
+                        (status) => {
+                            set({ streamStatus: status })
+                        }
+                    )
+                } catch (err: unknown) {
+                    if (!(err instanceof Error) || err.name !== 'AbortError') {
+                        const failed = new Set(get().failedLevels)
+                        failed.add(level)
+                        set({
+                            failedLevels: failed,
+                            error: err instanceof Error ? err.message : 'Request failed',
+                            streamStatus: 'degraded',
+                            lastFailedRequest: { topic, mode, level },
+                        })
+                    }
+                } finally {
+                    const remaining = new Set(get().fetchingLevels)
+                    remaining.delete(level)
+                    if (remaining.size === 0 && get().streamStatus === 'live') {
+                        set({ fetchingLevels: remaining, streamStatus: 'idle' })
+                    } else {
+                        set({ fetchingLevels: remaining })
+                    }
+                }
+            },
+
+            startSearch: async (topic: string, forceRefresh = false, requestedMode?: Mode, requestedLevel?: Level) => {
+                if (!topic.trim()) return
+
+                const state = get()
+                state.abortCurrentStream()
+
+                const effectiveMode = requestedMode || state.mode
+                const activeLevel = requestedLevel || state.selectedLevel
+
+                if (!forceRefresh) {
+                    set({ result: null, error: null, lastFailedRequest: null })
+                }
+
+                if (requestedMode && requestedMode !== state.mode) set({ mode: requestedMode })
+                if (requestedLevel && requestedLevel !== state.selectedLevel) set({ selectedLevel: activeLevel })
+
+                set({
+                    activeTopic: topic,
+                    loadingMeta: { mode: effectiveMode, level: activeLevel, topic },
+                    loading: true,
+                    error: null,
+                    streamStatus: 'idle',
+                })
+
+                if (forceRefresh) {
+                    const currentResult = get().result
+                    if (currentResult) {
+                        set({
+                            result: {
+                                ...currentResult,
+                                explanations: { ...currentResult.explanations, [activeLevel]: '' },
+                            },
+                        })
+                    } else {
+                        set({
+                            result: { topic, explanations: {}, mode: effectiveMode },
+                        })
                     }
 
-                    set({
-                        result: {
-                            ...currentState.result,
-                            explanations: {
-                                ...currentState.result.explanations,
-                                [level]: streamedText,
-                            },
-                        },
+                    const randomTemp = Math.random() * (1.1 - 0.95) + 0.95
+                    set({ fetchingLevels: new Set(), failedLevels: new Set() })
+
+                    await get().fetchLevel(topic, activeLevel, effectiveMode, {
+                        temperature: randomTemp,
+                        regenerate: true,
                     })
-                },
-                () => undefined,
-                (error: unknown) => {
-                    const failed = new Set(get().failedLevels)
-                    failed.add(level)
-                    const message = error instanceof Error ? error.message : 'Request failed'
-                    set({
-                        failedLevels: failed,
-                        error: message,
-                        streamStatus: 'degraded',
-                        lastFailedRequest: { topic, mode, level },
-                    })
-                },
-                controller.signal,
-                (status) => {
-                    set({ streamStatus: status })
+                    set({ loading: false, loadingMeta: null })
+                    return
                 }
-            )
-        } catch (err: unknown) {
-            if (!(err instanceof Error) || err.name !== 'AbortError') {
-                const failed = new Set(get().failedLevels)
-                failed.add(level)
-                set({
-                    failedLevels: failed,
-                    error: err instanceof Error ? err.message : 'Request failed',
-                    streamStatus: 'degraded',
-                    lastFailedRequest: { topic, mode, level },
-                })
-            }
-        } finally {
-            const remaining = new Set(get().fetchingLevels)
-            remaining.delete(level)
-            if (remaining.size === 0 && get().streamStatus === 'live') {
-                set({ fetchingLevels: remaining, streamStatus: 'idle' })
-            } else {
-                set({ fetchingLevels: remaining })
-            }
-        }
-    },
 
-    startSearch: async (topic: string, forceRefresh = false, requestedMode?: Mode, requestedLevel?: Level) => {
-        if (!topic.trim()) return
-
-        const state = get()
-        state.abortCurrentStream()
-
-        const effectiveMode = requestedMode || state.mode
-        const activeLevel = requestedLevel || state.selectedLevel
-
-        if (!forceRefresh) {
-            set({ result: null, error: null, lastFailedRequest: null })
-        }
-
-        if (requestedMode && requestedMode !== state.mode) set({ mode: requestedMode })
-        if (requestedLevel && requestedLevel !== state.selectedLevel) set({ selectedLevel: activeLevel })
-
-        set({
-            activeTopic: topic,
-            loadingMeta: { mode: effectiveMode, level: activeLevel, topic },
-            loading: true,
-            error: null,
-            streamStatus: 'idle',
-        })
-
-        if (forceRefresh) {
-            const currentResult = get().result
-            if (currentResult) {
-                set({
-                    result: {
-                        ...currentResult,
-                        explanations: { ...currentResult.explanations, [activeLevel]: '' },
-                    },
-                })
-            } else {
                 set({
                     result: { topic, explanations: {}, mode: effectiveMode },
+                    fetchingLevels: new Set(),
+                    failedLevels: new Set(),
                 })
-            }
 
-            const randomTemp = Math.random() * (1.1 - 0.95) + 0.95
-            set({ fetchingLevels: new Set(), failedLevels: new Set() })
+                await get().fetchLevel(topic, activeLevel, effectiveMode)
+                set({ loading: false, loadingMeta: null })
+            },
 
-            await get().fetchLevel(topic, activeLevel, effectiveMode, {
-                temperature: randomTemp,
-                regenerate: true,
-            })
-            set({ loading: false, loadingMeta: null })
-            return
+            retryLastFailed: async () => {
+                const failed = get().lastFailedRequest
+                if (!failed) return
+                await get().startSearch(failed.topic, true, failed.mode, failed.level)
+            },
+
+            reset: () => set({ ...initialState }),
+        }),
+        {
+            name: STORE_KEY,
+            storage: createJSONStorage(() => localStorage),
+            partialize: (state) => ({
+                mode: state.mode,
+                selectedLevel: state.selectedLevel,
+                isSidebarOpen: state.isSidebarOpen,
+                favoriteTopics: state.favoriteTopics,
+            }),
+            merge: (persistedState, currentState) => {
+                const persisted = (persistedState ?? {}) as Partial<KnowBearState>
+                const safeFavorites = Array.isArray(persisted.favoriteTopics)
+                    ? persisted.favoriteTopics.filter((item): item is string => typeof item === 'string')
+                    : currentState.favoriteTopics
+
+                return {
+                    ...currentState,
+                    ...persisted,
+                    favoriteTopics: safeFavorites,
+                }
+            },
         }
-
-        set({
-            result: { topic, explanations: {}, mode: effectiveMode },
-            fetchingLevels: new Set(),
-            failedLevels: new Set(),
-        })
-
-        await get().fetchLevel(topic, activeLevel, effectiveMode)
-        set({ loading: false, loadingMeta: null })
-    },
-
-    retryLastFailed: async () => {
-        const failed = get().lastFailedRequest
-        if (!failed) return
-        await get().startSearch(failed.topic, true, failed.mode, failed.level)
-    },
-
-    reset: () => set(initialState),
-}))
+    )
+)
