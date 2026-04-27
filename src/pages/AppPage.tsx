@@ -158,9 +158,6 @@ export default function AppPage() {
                     <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 pt-5 pb-6 sm:pt-8 sm:pb-8 space-y-4 sm:space-y-6">
                         <div className="space-y-3 pt-1 sm:pt-2">
                             <SearchBar onSearch={(topic) => handleSearch(topic, false)} loading={loading} mode={mode} onModeChange={setMode} />
-                            {!activeTopic && (
-                                <PinnedTopics topics={visiblePinnedTopics} onSelect={(topic) => handleSearch(topic, false)} />
-                            )}
 
                             {modeSwitching && (
                                 <motion.div
@@ -197,6 +194,16 @@ export default function AppPage() {
                                 </motion.div>
                             )}
                         </div>
+
+                        {!activeTopic && !loading && !result && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="pt-4 sm:pt-6"
+                            >
+                                <PinnedTopics topics={visiblePinnedTopics} onSelect={(topic) => handleSearch(topic, false)} />
+                            </motion.div>
+                        )}
 
                         <AnimatePresence mode="wait">
                             {loading && loadingMeta ? (
@@ -258,9 +265,9 @@ export default function AppPage() {
                                     />
                                 </motion.section>
                             ) : (
-                                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-10 sm:py-12">
+                                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center pt-4 pb-6 sm:pt-6 sm:pb-8">
                                     <p className="text-gray-400 text-base sm:text-lg mb-2">Search for a topic to get started</p>
-                                    <p className="text-gray-500 text-sm mb-6 sm:mb-8">Type a topic above to begin.</p>
+                                    <p className="text-gray-500 text-sm">Type a topic above to begin.</p>
                                 </motion.div>
                             )}
                         </AnimatePresence>
