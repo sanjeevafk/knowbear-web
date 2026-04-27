@@ -14,6 +14,7 @@ Both modes use the same retrieval entry point and enrich prompts with live web c
 - `ensemble` mode: multi-model generation with judge selection
 - Streaming responses over SSE
 - Export as `.txt` or `.md`
+- Upstash Redis-backed token rate limiting and response/search caching (with in-memory fallback)
 
 ## Architecture (High Level)
 
@@ -30,6 +31,7 @@ Both modes use the same retrieval entry point and enrich prompts with live web c
 - `POST /api/query/stream` -> stream generated text
 - `POST /api/export` -> export as `txt` or `md`
 - `GET /api/health` -> service status
+- `GET /api/keep-alive` -> lightweight warm-up probe (Vercel + Upstash Redis ping/get)
 
 ## Setup
 
@@ -55,6 +57,28 @@ Recommended:
 - `TAVILY_API_KEY`
 - `SERPER_API_KEY`
 - `EXA_API_KEY`
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for Redis keep-alive
+- `TOKEN_RATE_LIMIT_ENABLED` and `TOKEN_RATE_LIMIT_PER_IP_HOUR` for token throttling behavior
+
+Optional:
+
+- `UPSTASH_KEEPALIVE_KEY` key name to read during `/api/keep-alive` (default: `keepalive:last`)
+
+## Keep-Alive (UptimeRobot)
+
+Use `GET /api/keep-alive` with a 5-minute interval from UptimeRobot. The endpoint returns `200` with `{ "status": "alive" }` and performs lightweight Upstash Redis commands (`PING` + `GET` on `UPSTASH_KEEPALIVE_KEY`) to keep both the Vercel function and Redis path warm.
+
+The route uses short HTTP timeouts to stay fast on Vercel hobby serverless and reduce cold-start impact.
+
+## Redis-Backed Limits And Cache
+
+When Upstash env vars are configured:
+
+- Token rate limiting is enforced in Redis (shared across serverless instances) in `token_rate_limit.py`.
+- Query response cache is stored in Redis with TTL (5 minutes) in `routers/query.py`.
+- Search context cache is stored in Redis with profile-based TTL in `services/search.py`.
+
+If Upstash is unavailable or not configured, the app falls back to existing in-memory behavior.
 
 ### 3) Run the app
 

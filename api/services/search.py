@@ -6,6 +6,7 @@ import time
 import httpx
 from config import get_settings
 from logging_config import logger
+from services.upstash_redis import get_upstash_redis_client
 
 settings = get_settings()
 
@@ -36,7 +37,7 @@ class SearchManager:
             return "No external context found."
 
         cache_key = self._cache_key(query, profile)
-        cached = self._cache_get(cache_key, profile)
+        cached = await self._cache_get(cache_key, profile)
         if cached:
             logger.info("search_cache_hit", mode=profile, query=query)
             return cached
@@ -47,7 +48,7 @@ class SearchManager:
         if existing_task:
             try:
                 content = await asyncio.wait_for(asyncio.shield(existing_task), timeout=timeout)
-                self._cache_set(cache_key, content, profile)
+                await self._cache_set(cache_key, content, profile)
                 return content if content else "No external context found."
             except Exception as e:
                 logger.warning("search_inflight_wait_failed", mode=profile, error=str(e))
@@ -69,7 +70,7 @@ class SearchManager:
         logger.info("search_completed", mode=profile, latency_ms=elapsed_ms, used=bool(content), query=query)
 
         if content:
-            self._cache_set(cache_key, content, profile)
+            await self._cache_set(cache_key, content, profile)
 
         return content if content else "No external context found."
 
@@ -116,7 +117,13 @@ class SearchManager:
         digest = hashlib.sha256(normalized.encode()).hexdigest()
         return f"{profile}:{digest}"
 
-    def _cache_get(self, key: str, profile: str) -> str | None:
+    async def _cache_get(self, key: str, profile: str) -> str | None:
+        redis = get_upstash_redis_client()
+        if redis.configured:
+            remote = await redis.get(f"search_cache:{key}")
+            if remote:
+                return remote
+
         hit = self._cache.get(key)
         if not hit:
             return None
@@ -126,8 +133,11 @@ class SearchManager:
             return None
         return value
 
-    def _cache_set(self, key: str, value: str, profile: str) -> None:
+    async def _cache_set(self, key: str, value: str, profile: str) -> None:
         ttl = self.fast_cache_ttl_seconds if profile == "fast" else self.ensemble_cache_ttl_seconds
+        redis = get_upstash_redis_client()
+        if redis.configured:
+            await redis.setex(f"search_cache:{key}", ttl, value)
         self._cache[key] = (time.time() + ttl, value)
 
     def _should_retrieve(self, query: str, policy: str, profile: str) -> tuple[bool, str]:

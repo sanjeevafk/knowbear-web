@@ -14,6 +14,7 @@ from typing import cast
 from logging_config import logger
 from services.ensemble import ensemble_generate
 from services.inference import generate_stream_explanation
+from services.upstash_redis import get_upstash_redis_client
 from token_rate_limit import TokenRateLimitExceeded
 from utils import LEVELS, sanitize_topic
 
@@ -66,10 +67,16 @@ def _get_client_ip(request: Request) -> str:
 
 
 def _cache_key(topic: str, level: str, mode: str, retrieval: str | None) -> str:
-    return f"{topic.lower()}::{level}::{mode}::{retrieval or 'auto'}"
+    return f"query_cache:{topic.lower()}::{level}::{mode}::{retrieval or 'auto'}"
 
 
-def _cache_get(key: str) -> str | None:
+async def _cache_get(key: str) -> str | None:
+    redis = get_upstash_redis_client()
+    if redis.configured:
+        remote = await redis.get(key)
+        if remote:
+            return remote
+
     hit = _response_cache.get(key)
     if not hit:
         return None
@@ -80,7 +87,11 @@ def _cache_get(key: str) -> str | None:
     return value
 
 
-def _cache_set(key: str, value: str) -> None:
+async def _cache_set(key: str, value: str) -> None:
+    redis = get_upstash_redis_client()
+    if redis.configured:
+        await redis.setex(key, RESPONSE_CACHE_TTL_SECONDS, value)
+
     _response_cache[key] = (time.time() + RESPONSE_CACHE_TTL_SECONDS, value)
 
 
@@ -118,7 +129,7 @@ async def query_topic(req: QueryRequest, request: Request) -> QueryResponse:
     for level in levels:
         key = _cache_key(topic, level, req.mode, req.retrieval)
         if not req.regenerate:
-            cached = _cache_get(key)
+            cached = await _cache_get(key)
             if cached:
                 explanations[level] = cached
                 continue
@@ -131,7 +142,7 @@ async def query_topic(req: QueryRequest, request: Request) -> QueryResponse:
         if isinstance(result, str):
             explanations[level] = result
             if not req.regenerate:
-                _cache_set(_cache_key(topic, level, req.mode, req.retrieval), result)
+                await _cache_set(_cache_key(topic, level, req.mode, req.retrieval), result)
         elif isinstance(result, TokenRateLimitExceeded):
             raise HTTPException(
                 status_code=429,
@@ -164,7 +175,7 @@ async def query_topic_stream(req: QueryRequest, request: Request):
     level = req.levels[0] if req.levels and req.levels[0] in ALL_LEVELS else "eli5"
     cache_key = _cache_key(topic, level, req.mode, req.retrieval)
     if not req.regenerate:
-        cached = _cache_get(cache_key)
+        cached = await _cache_get(cache_key)
         if cached:
             async def cached_event_generator():
                 yield f"data: {json.dumps({'topic': topic, 'level': level})}\n\n"
@@ -239,7 +250,7 @@ async def query_topic_stream(req: QueryRequest, request: Request):
                 yield f"data: {json.dumps({'chunk': buffer})}\n\n"
 
             if full_content and not req.regenerate:
-                _cache_set(cache_key, full_content)
+                await _cache_set(cache_key, full_content)
             yield "data: [DONE]\n\n"
 
         except TokenRateLimitExceeded as e:

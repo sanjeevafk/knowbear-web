@@ -16,6 +16,7 @@ from logging_config import logger, setup_logging
 from routers import pinned, query
 from services.inference import close_client
 from services.model_provider import ModelError, ModelProvider, ModelUnavailable
+from services.upstash_redis import close_upstash_redis_client, get_upstash_redis_client
 from token_rate_limit import TokenRateLimitExceeded
 
 
@@ -29,7 +30,7 @@ async def lifespan(app: FastAPI):
     logger.info("startup", gemini_configured=provider.gemini_configured)
 
     yield
-    await asyncio.gather(close_client(), ModelProvider.get_instance().close())
+    await asyncio.gather(close_client(), ModelProvider.get_instance().close(), close_upstash_redis_client())
 
 
 app = FastAPI(
@@ -171,6 +172,30 @@ async def health():
         status["google_genai"] = f"missing: {str(e)}"
 
     return status
+
+
+async def _upstash_keepalive() -> dict:
+    redis = get_upstash_redis_client()
+    if not redis.configured:
+        return {"ok": False, "skipped": True, "reason": "Upstash Redis REST env vars not configured"}
+
+    ping_ok = await redis.ping()
+    warm_key = os.getenv("UPSTASH_KEEPALIVE_KEY", "keepalive:last")
+    _ = await redis.get(warm_key)
+    return {"ok": ping_ok, "method": "ping+get", "key": warm_key}
+
+
+@app.get("/api/keep-alive", tags=["health"])
+async def keep_alive():
+    upstash_result = await _upstash_keepalive()
+    if isinstance(upstash_result, Exception):
+        upstash_result = {"ok": False, "error": str(upstash_result)}
+
+    return {
+        "status": "alive",
+        "timestamp": datetime.utcnow().isoformat(),
+        "probes": {"upstash_redis": upstash_result},
+    }
 
 
 @app.get("/{path:path}")
