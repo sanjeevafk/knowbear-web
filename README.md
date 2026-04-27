@@ -82,16 +82,30 @@ If Upstash is unavailable or not configured, the app falls back to existing in-m
 
 ### 3) Run the app
 
+Unified local command (frontend + backend):
+
+```bash
+npm run local:start
+```
+
+Or run each service separately:
+
 Backend:
 
 ```bash
-python3 -m uvicorn main:app --reload
+python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000 --app-dir api
 ```
 
 Frontend:
 
 ```bash
 npm run dev
+```
+
+### 4) Run with Docker
+
+```bash
+docker compose up --build
 ```
 
 ## Usage
