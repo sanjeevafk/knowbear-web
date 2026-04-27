@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RefreshCcw, RotateCcw, AlertTriangle } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import type { Level, Mode, PinnedTopic } from '../types'
 import SearchBar from '../components/SearchBar'
 import LevelDropdown from '../components/LevelDropdown'
@@ -17,31 +18,59 @@ const FALLBACK_PINNED_TOPICS: PinnedTopic[] = [
 ]
 
 export default function AppPage() {
-    const loading = useKnowBearStore((state) => state.loading)
-    const result = useKnowBearStore((state) => state.result)
-    const selectedLevel = useKnowBearStore((state) => state.selectedLevel)
-    const error = useKnowBearStore((state) => state.error)
-    const mode = useKnowBearStore((state) => state.mode)
-    const fetchingLevels = useKnowBearStore((state) => state.fetchingLevels)
-    const failedLevels = useKnowBearStore((state) => state.failedLevels)
-    const activeTopic = useKnowBearStore((state) => state.activeTopic)
-    const loadingMeta = useKnowBearStore((state) => state.loadingMeta)
-    const modeSwitching = useKnowBearStore((state) => state.modeSwitching)
-    const streamStatus = useKnowBearStore((state) => state.streamStatus)
-    const lastFailedRequest = useKnowBearStore((state) => state.lastFailedRequest)
+    const {
+        loading,
+        result,
+        selectedLevel,
+        error,
+        mode,
+        fetchingLevels,
+        failedLevels,
+        activeTopic,
+        loadingMeta,
+        modeSwitching,
+        streamStatus,
+        lastFailedRequest,
+        pinnedTopics,
+    } = useKnowBearStore(useShallow((state) => ({
+        loading: state.loading,
+        result: state.result,
+        selectedLevel: state.selectedLevel,
+        error: state.error,
+        mode: state.mode,
+        fetchingLevels: state.fetchingLevels,
+        failedLevels: state.failedLevels,
+        activeTopic: state.activeTopic,
+        loadingMeta: state.loadingMeta,
+        modeSwitching: state.modeSwitching,
+        streamStatus: state.streamStatus,
+        lastFailedRequest: state.lastFailedRequest,
+        pinnedTopics: state.pinnedTopics,
+    })))
 
-    const setSelectedLevel = useKnowBearStore((state) => state.setSelectedLevel)
-    const setMode = useKnowBearStore((state) => state.setMode)
-    const setModeSwitching = useKnowBearStore((state) => state.setModeSwitching)
-    const setResult = useKnowBearStore((state) => state.setResult)
-    const setFetchingLevels = useKnowBearStore((state) => state.setFetchingLevels)
-    const startSearch = useKnowBearStore((state) => state.startSearch)
-    const fetchLevel = useKnowBearStore((state) => state.fetchLevel)
-    const abortCurrentStream = useKnowBearStore((state) => state.abortCurrentStream)
-    const retryLastFailed = useKnowBearStore((state) => state.retryLastFailed)
-    
-    const pinnedTopics = useKnowBearStore((state) => state.pinnedTopics)
-    const fetchPinnedTopics = useKnowBearStore((state) => state.fetchPinnedTopics)
+    const {
+        setSelectedLevel,
+        setMode,
+        setModeSwitching,
+        setResult,
+        setFetchingLevels,
+        startSearch,
+        fetchLevel,
+        abortCurrentStream,
+        retryLastFailed,
+        fetchPinnedTopics,
+    } = useKnowBearStore(useShallow((state) => ({
+        setSelectedLevel: state.setSelectedLevel,
+        setMode: state.setMode,
+        setModeSwitching: state.setModeSwitching,
+        setResult: state.setResult,
+        setFetchingLevels: state.setFetchingLevels,
+        startSearch: state.startSearch,
+        fetchLevel: state.fetchLevel,
+        abortCurrentStream: state.abortCurrentStream,
+        retryLastFailed: state.retryLastFailed,
+        fetchPinnedTopics: state.fetchPinnedTopics,
+    })))
 
     useEffect(() => {
         fetchPinnedTopics()
@@ -109,14 +138,14 @@ export default function AppPage() {
     const sourceChips = (() => {
         const content = result?.explanations?.[selectedLevel] || ''
         const urlRegex = /https?:\/\/[^\s)]+/g
-        const urls = Array.from(new Set((content.match(urlRegex) || []).map((url) => {
+        const urls = Array.from(new Set((content.match(urlRegex) || []).map((url: string) => {
             try {
                 const parsed = new URL(url)
                 return parsed.hostname.replace(/^www\./, '')
             } catch {
                 return null
             }
-        }).filter((host): host is string => Boolean(host))))
+        }).filter((host: string | null): host is string => Boolean(host))))
         return urls.slice(0, 5)
     })()
 

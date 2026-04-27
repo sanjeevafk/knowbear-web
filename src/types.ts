@@ -6,7 +6,7 @@ export interface PinnedTopic {
 
 export interface QueryRequest {
     topic: string
-    levels?: string[]
+    levels?: Level[]
     mode?: 'fast' | 'ensemble'
     retrieval?: 'auto' | 'required' | 'on' | 'off'
     temperature?: number
