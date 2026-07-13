@@ -2,9 +2,12 @@ FROM node:20-bookworm
 
 WORKDIR /app
 
+# Prevent pip from block-failing on Debian Bookworm system environment checks
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+
 # Install Python for FastAPI backend
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-pip \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 # Install frontend dependencies first for better layer caching
@@ -20,4 +23,4 @@ COPY . .
 
 EXPOSE 5173 8000
 
-CMD ["npm", "run", "local:start"]
+CMD ["npm", "run", "docker:start"]
