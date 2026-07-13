@@ -10,6 +10,7 @@
         "local:deps:api": "python -m pip install -r api/requirements.txt",
         "local:deps": "npm run local:deps:frontend && npm run local:deps:api",
         "local:start": "npm run local:deps && concurrently -k -n FRONTEND,BACKEND -c cyan,green \"npm run dev\" \"npm run dev:api\"",
+        "docker:start": "concurrently -k -n FRONTEND,BACKEND -c cyan,green \"npm run dev\" \"npm run dev:api\"",
         "build": "node node_modules/vite/bin/vite.js build",
         "vercel-build": "npm run build",
         "type-check": "tsc -b",
