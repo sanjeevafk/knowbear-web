@@ -7,6 +7,7 @@ import time
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from .schemas import ErrorResponse, RateLimitResponse
 
 from collections.abc import AsyncIterator, Iterator
 from typing import cast
@@ -27,17 +28,59 @@ _response_cache: dict[str, tuple[float, str]] = {}
 
 
 class QueryRequest(BaseModel):
-    topic: str = Field(..., min_length=1, max_length=200)
-    levels: list[str] = Field(default=ALL_LEVELS)
-    mode: str = "ensemble"
-    retrieval: str | None = Field(default=None, pattern="^(auto|required|on|off)$")
-    temperature: float = 0.7
-    regenerate: bool = False
+    topic: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=200,
+        description="The educational topic, system, or protocol to search and explain.",
+        json_schema_extra={"example": "TCP/IP Layers"}
+    )
+    levels: list[str] = Field(
+        default=ALL_LEVELS,
+        description="The target explanation depth levels.",
+        json_schema_extra={"example": ["eli5", "eli12"]}
+    )
+    mode: str = Field(
+        "ensemble",
+        description="The generation mode: 'fast' or 'ensemble'.",
+        json_schema_extra={"example": "ensemble"}
+    )
+    retrieval: str | None = Field(
+        default=None, 
+        pattern="^(auto|required|on|off)$",
+        description="Web retrieval mode parameter.",
+        json_schema_extra={"example": "auto"}
+    )
+    temperature: float = Field(
+        0.7,
+        ge=0.0,
+        le=1.5,
+        description="Sampling temperature for creativity control.",
+        json_schema_extra={"example": 0.7}
+    )
+    regenerate: bool = Field(
+        False,
+        description="Forces new search and generation bypassing cached data.",
+        json_schema_extra={"example": False}
+    )
 
 
 class QueryResponse(BaseModel):
-    topic: str
-    explanations: dict[str, str]
+    topic: str = Field(
+        ...,
+        description="Sanitized input topic.",
+        json_schema_extra={"example": "TCP/IP Layers"}
+    )
+    explanations: dict[str, str] = Field(
+        ...,
+        description="Map of explanation levels to generated markdown content.",
+        json_schema_extra={
+            "example": {
+                "eli5": "Think of the internet like a post office...",
+                "eli12": "TCP/IP layers organize protocol responsibilities..."
+            }
+        }
+    )
 
 
 def _normalize_mode(mode: str) -> str:
@@ -106,7 +149,17 @@ async def _stream_chunks(stream: AsyncIterator[str] | Iterator[str]):
         await asyncio.sleep(0)
 
 
-@router.post("/query", response_model=QueryResponse)
+@router.post(
+    "/query",
+    response_model=QueryResponse,
+    summary="Batch Generate Explanations",
+    description="Synchronously generates explanations for a topic across all requested levels.",
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid parameters or topic validation failure"},
+        429: {"model": RateLimitResponse, "description": "Rate limit exceeded"},
+        500: {"model": ErrorResponse, "description": "Internal server error during LLM generation"}
+    }
+)
 async def query_topic(req: QueryRequest, request: Request) -> QueryResponse:
     """Generate explanations for a topic."""
     req.mode = _normalize_mode(req.mode)
@@ -166,7 +219,30 @@ async def query_topic(req: QueryRequest, request: Request) -> QueryResponse:
     return QueryResponse(topic=topic, explanations=explanations)
 
 
-@router.post("/query/stream")
+@router.post(
+    "/query/stream",
+    summary="Stream Explanation (SSE)",
+    description=(
+        "Establishes a Server-Sent Events (SSE) stream yielding real-time chunks of "
+        "the explanation for the first target level (defaults to eli5)."
+    ),
+    responses={
+        200: {
+            "description": "Stream opened successfully",
+            "content": {
+                "text/event-stream": {
+                    "schema": {
+                        "type": "string",
+                        "description": "Event-stream payload lines containing JSON data structure"
+                    }
+                }
+            }
+        },
+        400: {"model": ErrorResponse, "description": "Invalid request parameters"},
+        429: {"model": RateLimitResponse, "description": "Rate limit exceeded"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
 async def query_topic_stream(req: QueryRequest, request: Request):
     """Stream explanations for a topic."""
     req.mode = _normalize_mode(req.mode)
