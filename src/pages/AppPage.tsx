@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RefreshCcw, RotateCcw, AlertTriangle } from 'lucide-react'
 import { useShallow } from 'zustand/react/shallow'
@@ -6,9 +7,13 @@ import type { Level, Mode, PinnedTopic } from '../types'
 import SearchBar from '../components/SearchBar'
 import LevelDropdown from '../components/LevelDropdown'
 import ExplanationCard from '../components/ExplanationCard'
+import Sidebar from '../components/Sidebar'
+import MobileBottomNav from '../components/MobileBottomNav'
+import MobileHeader from '../components/MobileHeader'
 import { LoadingState } from '../components/LoadingState'
 import PinnedTopics from '../components/PinnedTopics'
 import { useKnowBearStore } from '../store/useKnowBearStore'
+import ThemeToggle from '../components/ThemeToggle'
 
 const FALLBACK_PINNED_TOPICS: PinnedTopic[] = [
     { id: 'tcp-ip', title: 'TCP/IP Layers', description: 'Protocols and responsibilities by layer.' },
@@ -18,6 +23,8 @@ const FALLBACK_PINNED_TOPICS: PinnedTopic[] = [
 ]
 
 export default function AppPage() {
+    const [searchParams, setSearchParams] = useSearchParams()
+    
     const {
         loading,
         result,
@@ -32,6 +39,8 @@ export default function AppPage() {
         streamStatus,
         lastFailedRequest,
         pinnedTopics,
+        isSidebarOpen,
+        favoriteTopics,
     } = useKnowBearStore(useShallow((state) => ({
         loading: state.loading,
         result: state.result,
@@ -46,6 +55,8 @@ export default function AppPage() {
         streamStatus: state.streamStatus,
         lastFailedRequest: state.lastFailedRequest,
         pinnedTopics: state.pinnedTopics,
+        isSidebarOpen: state.isSidebarOpen,
+        favoriteTopics: state.favoriteTopics,
     })))
 
     const {
@@ -59,6 +70,8 @@ export default function AppPage() {
         abortCurrentStream,
         retryLastFailed,
         fetchPinnedTopics,
+        setIsSidebarOpen,
+        toggleFavoriteTopic,
     } = useKnowBearStore(useShallow((state) => ({
         setSelectedLevel: state.setSelectedLevel,
         setMode: state.setMode,
@@ -70,11 +83,9 @@ export default function AppPage() {
         abortCurrentStream: state.abortCurrentStream,
         retryLastFailed: state.retryLastFailed,
         fetchPinnedTopics: state.fetchPinnedTopics,
+        setIsSidebarOpen: state.setIsSidebarOpen,
+        toggleFavoriteTopic: state.toggleFavoriteTopic,
     })))
-
-    useEffect(() => {
-        fetchPinnedTopics()
-    }, [fetchPinnedTopics])
 
     const handleSearch = useCallback(
         async (topic: string, forceRefresh = false, requestedMode?: Mode, requestedLevel?: Level) => {
@@ -82,6 +93,19 @@ export default function AppPage() {
         },
         [startSearch]
     )
+
+    useEffect(() => {
+        const query = searchParams.get('q')
+        if (query && query.trim()) {
+            searchParams.delete('q')
+            setSearchParams(searchParams, { replace: true })
+            handleSearch(query.trim(), false)
+        }
+    }, [searchParams, setSearchParams, handleSearch])
+
+    useEffect(() => {
+        fetchPinnedTopics()
+    }, [fetchPinnedTopics])
 
     useEffect(() => {
         if (activeTopic && !loading && result && result.mode !== mode && !loadingMeta) {
@@ -153,58 +177,74 @@ export default function AppPage() {
 
     return (
         <div className="flex h-screen bg-dark-900 text-white overflow-hidden">
-            <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto">
-                    <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 pt-5 pb-6 sm:pt-8 sm:pb-8 space-y-4 sm:space-y-6">
-                        <div className="space-y-3 pt-1 sm:pt-2">
-                            <SearchBar onSearch={(topic) => handleSearch(topic, false)} loading={loading} mode={mode} onModeChange={setMode} />
+            <Sidebar
+                isOpen={isSidebarOpen}
+                onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+                onSelectTopic={(topic) => handleSearch(topic, false)}
+                favoriteTopics={favoriteTopics}
+                onToggleFavorite={toggleFavoriteTopic}
+            />
 
-                            {modeSwitching && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="flex items-center gap-2 text-sm text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-lg px-4 py-2"
-                                >
-                                    <RefreshCcw className="w-4 h-4 animate-spin" />
-                                    <span>Switching mode...</span>
-                                </motion.div>
-                            )}
+            <main className={`flex-grow flex flex-col overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'md:pl-64' : 'md:pl-16'}`}>
+                <MobileHeader isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-                            {error && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 text-red-400 space-y-3"
-                                >
-                                    <p>{error}</p>
-                                    {lastFailedRequest && (
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <button
-                                                onClick={() => retryLastFailed()}
-                                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-100 text-sm"
-                                            >
-                                                <AlertTriangle className="w-4 h-4" />
-                                                Retry Last Failed
-                                            </button>
-                                            <span className="text-xs text-red-200/70">
-                                                {lastFailedRequest.topic} - {lastFailedRequest.mode} - {lastFailedRequest.level}
-                                            </span>
-                                        </div>
-                                    )}
-                                </motion.div>
-                            )}
-                        </div>
-
-                        {!activeTopic && !loading && !result && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="pt-4 sm:pt-6"
-                            >
-                                <PinnedTopics topics={visiblePinnedTopics} onSelect={(topic) => handleSearch(topic, false)} />
-                            </motion.div>
+                {/* Top Action Bar for Desktop */}
+                <div className="hidden md:flex items-center justify-between px-8 py-3 border-b border-dark-700 bg-dark-900/40 backdrop-blur-md select-none shrink-0">
+                    <div>
+                        {!result && (
+                            <span className="text-xs font-semibold uppercase tracking-widest text-gray-500 font-mono">
+                                Workspace
+                            </span>
                         )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <ThemeToggle />
+                    </div>
+                </div>
 
+                <div className="flex-1 overflow-y-auto">
+                    <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 pt-10 pb-6 sm:pt-12 sm:pb-8 space-y-4 sm:space-y-6">
+                        {/* Render SearchBar at top ONLY if result is present or loading */}
+                        {(result || loading) && (
+                            <div className="space-y-4 pt-2 sm:pt-3">
+                                <SearchBar onSearch={(topic) => handleSearch(topic, false)} loading={loading} mode={mode} onModeChange={setMode} value={activeTopic} />
+
+                                {modeSwitching && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex items-center gap-2 text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-2"
+                                    >
+                                        <RefreshCcw className="w-4 h-4 animate-spin" />
+                                        <span>Switching mode...</span>
+                                    </motion.div>
+                                )}
+
+                                {error && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 text-red-400 space-y-3"
+                                    >
+                                        <p>{error}</p>
+                                        {lastFailedRequest && (
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    onClick={() => retryLastFailed()}
+                                                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-100 text-sm"
+                                                >
+                                                    <AlertTriangle className="w-4 h-4" />
+                                                    Retry Last Failed
+                                                </button>
+                                                <span className="text-xs text-red-200/70">
+                                                    {lastFailedRequest.topic} · {lastFailedRequest.mode} · {lastFailedRequest.level}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </div>
+                        )}
                         <AnimatePresence mode="wait">
                             {loading && loadingMeta ? (
                                 <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -223,7 +263,7 @@ export default function AppPage() {
                                             <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight break-words">{result.topic}</h2>
                                             <div className="mt-1 flex flex-wrap items-center gap-2">
                                                 <p className="text-sm text-gray-500">
-                                                    Mode: <span className="text-cyan-400 font-medium">{mode}</span>
+                                                    Mode: <span className="text-amber-400 font-medium">{mode}</span>
                                                 </p>
                                                 {streamBadge && (
                                                     <span className={`text-[11px] px-2 py-0.5 rounded-full border ${streamBadge.className}`}>
@@ -236,7 +276,7 @@ export default function AppPage() {
                                                     {sourceChips.map((source) => (
                                                         <span
                                                             key={source}
-                                                            className="text-[10px] px-2 py-0.5 rounded-full border border-cyan-500/30 text-cyan-200 bg-cyan-500/10"
+                                                            className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-200 bg-amber-500/10"
                                                         >
                                                             {source}
                                                         </span>
@@ -250,7 +290,7 @@ export default function AppPage() {
                                             <button
                                                 onClick={handleRegenerateSelectedLevel}
                                                 disabled={fetchingLevels.has(selectedLevel) || loading}
-                                                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <RotateCcw className="w-4 h-4" />
                                                 Regenerate Level
@@ -265,16 +305,48 @@ export default function AppPage() {
                                     />
                                 </motion.section>
                             ) : (
-                                <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center pt-4 pb-6 sm:pt-6 sm:pb-8">
-                                    <p className="text-gray-400 text-base sm:text-lg mb-2">Search for a topic to get started</p>
-                                    <p className="text-gray-500 text-sm">Type a topic above to begin.</p>
+                                <motion.div
+                                    key="empty"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0 }}
+                                    className="flex flex-col items-center justify-center min-h-[60vh] text-center max-w-3xl mx-auto space-y-10 py-8 px-4"
+                                >
+                                    <div className="flex flex-col items-center gap-3 select-none">
+                                        <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/5 animate-pulse-slow">
+                                            <img src="/favicon.svg" alt="KnowBear" className="w-9 h-9" />
+                                        </div>
+                                        <h2 className="text-3xl font-extrabold tracking-tight text-white mt-2">
+                                            What passes for knowledge...?
+                                        </h2>
+                                        <p className="text-gray-500 max-w-md text-sm sm:text-base leading-relaxed">
+                                            Search for any concept, system, or protocol to generate clear, multi-level syntheses.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full">
+                                        <SearchBar onSearch={(topic) => handleSearch(topic, false)} loading={loading} mode={mode} onModeChange={setMode} />
+                                    </div>
+
+                                    {visiblePinnedTopics.length > 0 && (
+                                        <div className="w-full pt-4">
+                                            <PinnedTopics topics={visiblePinnedTopics} onSelect={(topic) => handleSearch(topic, false)} />
+                                        </div>
+                                    )}
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
                 </div>
+
+                <MobileBottomNav
+                    onRegenerate={handleRegenerateSelectedLevel}
+                    loading={loading}
+                    hasResult={!!result}
+                    isSidebarOpen={isSidebarOpen}
+                    onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+                />
             </main>
         </div>
     )
 }
-

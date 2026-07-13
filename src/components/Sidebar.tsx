@@ -67,12 +67,12 @@ export default function Sidebar({ isOpen, onToggle, onSelectTopic, favoriteTopic
                 <div className={`p-4 flex flex-wrap items-center gap-3 border-b border-dark-700 ${!isOpen && 'justify-center'}`}>
                     <button
                         onClick={() => navigate('/')}
-                        className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded"
+                        className="cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500 rounded"
                         aria-label="Go to home"
                     >
-                        <img src="/favicon.svg" alt="Logo" className="w-8 h-8 drop-shadow-[0_0_8px_rgba(6,182,212,0.4)]" />
+                        <img src="/favicon.svg" alt="Logo" className="w-8 h-8" />
                     </button>
-                    {isOpen && <span className="text-white font-bold text-lg tracking-tight">Know<span className="text-cyan-500">Bear</span></span>}
+                    {isOpen && <span className="text-white font-bold text-lg tracking-tight">Know<span className="text-amber-500">Bear</span></span>}
                 </div>
 
                 <nav className="flex-grow overflow-y-auto custom-scrollbar p-3">
@@ -128,7 +128,7 @@ export default function Sidebar({ isOpen, onToggle, onSelectTopic, favoriteTopic
                             href="https://github.com/voidcommit-afk/knowbear-web"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-gray-400 hover:text-cyan-400 transition-colors"
+                            className="text-gray-400 hover:text-amber-400 transition-colors"
                             aria-label="GitHub repository"
                         >
                             <Github className="w-5 h-5" />

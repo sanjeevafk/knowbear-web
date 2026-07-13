@@ -1,4 +1,5 @@
 import { Menu, X } from 'lucide-react'
+import ThemeToggle from './ThemeToggle'
 
 interface MobileHeaderProps {
     isOpen: boolean
@@ -22,14 +23,14 @@ export default function MobileHeader({ isOpen, onToggle }: MobileHeaderProps) {
                         <img
                             src="/favicon.svg"
                             alt="KnowBear"
-                            className="w-6 h-6 drop-shadow-[0_0_6px_rgba(6,182,212,0.45)]"
+                            className="w-6 h-6"
                         />
                         <span className="text-sm font-semibold tracking-wide text-white">
-                            Know<span className="text-cyan-400">Bear</span>
+                            Know<span className="text-amber-500">Bear</span>
                         </span>
                     </div>
 
-                    <div className="w-10" aria-hidden />
+                    <ThemeToggle />
                 </div>
             </div>
         </div>

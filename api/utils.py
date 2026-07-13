@@ -1,11 +1,10 @@
 """Input validation and sanitization utilities."""
 
 import re
-import html
 
 MAX_TOPIC_LENGTH = 200
 CONTROL_CHARS_PATTERN = re.compile(r"[\x00-\x1f\x7f]")
-UNSAFE_MARKUP_PATTERN = re.compile(r"[<>]")
+ALLOWED_PATTERN = re.compile(r"^[\w\s\-.,!?'\"()\/+#&:=;@%$*\[\]]+$", re.UNICODE)
 
 
 def sanitize_topic(topic: str) -> str:
@@ -17,8 +16,9 @@ def sanitize_topic(topic: str) -> str:
         raise ValueError(f"Topic exceeds {MAX_TOPIC_LENGTH} chars")
     if CONTROL_CHARS_PATTERN.search(topic):
         raise ValueError("Invalid control characters in topic")
-    if UNSAFE_MARKUP_PATTERN.search(topic):
+    if not ALLOWED_PATTERN.match(topic):
         raise ValueError("Invalid characters in topic")
-    return html.escape(topic)
+    return topic
+
 
 LEVELS = ["eli5", "eli12", "eli15", "meme"]

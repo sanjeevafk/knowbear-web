@@ -65,8 +65,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({ mode, level, topic }
     return (
         <div className="flex flex-col items-center justify-center p-12 min-h-[400px] animate-in fade-in duration-700">
             <div className="relative mb-8">
-                <div className="absolute inset-0 bg-cyan-500/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
-                <Loader2 className="w-16 h-16 text-cyan-500 animate-spin relative z-10" />
+                <div className="absolute inset-0 bg-amber-500/20 blur-3xl rounded-full scale-150 animate-pulse"></div>
+                <Loader2 className="w-16 h-16 text-amber-500 animate-spin relative z-10" />
             </div>
 
             <div className="text-center space-y-6 max-w-lg">
@@ -77,7 +77,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({ mode, level, topic }
                             <span className="animate-[ellipsis_1.5s_infinite]">...</span>
                         </span>
                     </p>
-                    <p className="text-sm text-cyan-400/70 font-medium uppercase tracking-[0.2em]">
+                    <p className="text-sm text-amber-500/70 font-medium uppercase tracking-[0.2em]">
                         Meanwhile
                     </p>
                 </div>
