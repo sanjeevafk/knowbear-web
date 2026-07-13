@@ -71,8 +71,8 @@ export function LivePreviewCard() {
                 className="relative bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden"
             >
                 {/* Background Glow */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl -z-10" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600/5 rounded-full blur-3xl -z-10" />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -z-10" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-600/5 rounded-full blur-3xl -z-10" />
 
                 {/* Question Section */}
                 <div className="flex flex-wrap gap-4 items-start mb-8">
@@ -90,8 +90,8 @@ export function LivePreviewCard() {
 
                 {/* Answer Section */}
                 <div className="flex flex-wrap gap-4 items-start min-h-[160px]">
-                    <div className="w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
-                        <Sparkles className="w-5 h-5 text-cyan-400" />
+                    <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                        <Sparkles className="w-5 h-5 text-amber-500" />
                     </div>
                     <div className="flex-1 pt-2 space-y-4">
                         {step >= 2 && (
@@ -101,9 +101,9 @@ export function LivePreviewCard() {
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
-                                        className="text-cyan-500/50 text-sm font-mono flex items-center gap-2"
+                                        className="text-amber-500/50 text-sm font-mono flex items-center gap-2"
                                     >
-                                        <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" />
+                                        <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
                                         Thinking...
                                     </motion.div>
                                 )}
@@ -121,7 +121,7 @@ export function LivePreviewCard() {
                 </div>
 
                 {/* Status Bar / Decoration */}
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent opacity-50" />
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-500/20 to-transparent opacity-50" />
             </motion.div>
         </div>
     )
@@ -152,7 +152,7 @@ function TypingText({ text, start, className }: { text: string, start: boolean, 
     return (
         <p className={className}>
             {displayed}
-            {start && displayed.length < text.length && <span className="animate-pulse text-cyan-500">|</span>}
+            {start && displayed.length < text.length && <span className="animate-pulse text-amber-500">|</span>}
         </p>
     )
 }
@@ -177,7 +177,7 @@ function ResponseLine({ tokens, delay }: { tokens: { text: string, type: 'normal
             {tokens.map((token, i) => (
                 <span
                     key={i}
-                    className={token.type === 'highlight' ? "text-cyan-200 font-semibold drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]" : ""}
+                    className={token.type === 'highlight' ? "text-amber-200 font-semibold drop-shadow-[0_0_8px_rgba(245,158,11,0.25)]" : ""}
                 >
                     {token.text}
                 </span>

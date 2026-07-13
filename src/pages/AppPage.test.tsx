@@ -20,6 +20,18 @@ vi.mock('../components/ExplanationCard', () => ({
     default: ({ content }: { content: string }) => <div data-testid="explanation-card">{content}</div>,
 }))
 
+vi.mock('../components/Sidebar', () => ({
+    default: () => <div data-testid="sidebar">Sidebar</div>,
+}))
+
+vi.mock('../components/MobileHeader', () => ({
+    default: () => <div data-testid="mobile-header">Mobile Header</div>,
+}))
+
+vi.mock('../components/MobileBottomNav', () => ({
+    default: () => <div data-testid="mobile-nav">Mobile Nav</div>,
+}))
+
 vi.mock('../components/LoadingState', () => ({
     LoadingState: () => <div data-testid="loading-state">Loading...</div>,
 }))
@@ -38,7 +50,7 @@ describe('AppPage', () => {
         )
 
         expect(screen.getByTestId('search-bar')).toBeInTheDocument()
-        expect(screen.getByText('Search for a topic to get started')).toBeInTheDocument()
+        expect(screen.getByText('What passes for knowledge...?')).toBeInTheDocument()
     })
 
     it('renders result from store', () => {

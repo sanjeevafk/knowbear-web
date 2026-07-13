@@ -12,10 +12,10 @@ interface ExplanationCardProps {
 }
 
 const LEVEL_COLORS: Record<Level, string> = {
-    eli5: 'border-l-green-500',
-    eli12: 'border-l-cyan-500',
-    eli15: 'border-l-blue-500',
-    meme: 'border-l-purple-500',
+    eli5: 'level-eli5',
+    eli12: 'level-eli12',
+    eli15: 'level-eli15',
+    meme: 'level-meme',
 }
 
 const LEVEL_NAMES: Record<Level, string> = {
@@ -36,7 +36,7 @@ export default function ExplanationCard({ level, content, streaming }: Explanati
                 {LEVEL_NAMES[level]}
             </h3>
 
-            <div className="prose prose-invert max-w-none text-gray-200 leading-relaxed prose-headings:text-white prose-a:text-cyan-400 hover:prose-a:text-cyan-300 prose-code:text-cyan-300 prose-img:rounded-xl prose-hr:border-white/5">
+            <div className="prose prose-invert max-w-none text-gray-200 leading-relaxed prose-headings:text-white prose-a:text-amber-400 hover:prose-a:text-amber-300 prose-code:text-amber-300 prose-img:rounded-xl prose-hr:border-white/5">
                 <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -61,13 +61,13 @@ export default function ExplanationCard({ level, content, streaming }: Explanati
                             return <SafeImage src={src || ''} alt={alt || 'Image'} />
                         },
                         a({ ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
-                            return <a {...props} target="_blank" rel="noopener noreferrer" className="underline decoration-cyan-500/30 underline-offset-4 hover:decoration-cyan-400 transition-all font-medium" />
+                            return <a {...props} target="_blank" rel="noopener noreferrer" className="underline decoration-amber-500/30 underline-offset-4 hover:decoration-amber-400 transition-all font-medium" />
                         },
                         h2({ children }) {
                             return <h2 className="text-2xl font-bold mt-8 mb-4 text-white border-b border-white/5 pb-2">{children}</h2>
                         },
                         h3({ children }) {
-                            return <h3 className="text-xl font-semibold mt-6 mb-3 text-cyan-100">{children}</h3>
+                            return <h3 className="text-xl font-semibold mt-6 mb-3 text-amber-100">{children}</h3>
                         },
                         hr() {
                             return <hr className="my-8 border-white/10" />
@@ -77,10 +77,9 @@ export default function ExplanationCard({ level, content, streaming }: Explanati
                     {content}
                 </ReactMarkdown>
                 {streaming && (
-                    <span className="inline-block w-2 h-5 ml-1 bg-cyan-500 animate-[pulse_0.8s_infinite] vertical-middle" style={{ verticalAlign: 'middle' }}></span>
+                    <span className="inline-block w-2 h-5 ml-1 bg-amber-500 animate-[pulse_0.8s_infinite] vertical-middle" style={{ verticalAlign: 'middle' }}></span>
                 )}
             </div>
         </div>
     )
 }
-
